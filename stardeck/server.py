@@ -21,14 +21,20 @@ from starhtml.plugins import resize
 from stardeck.parser import parse_deck
 from stardeck.renderer import render_slide
 
-DECK_STYLES = """
-.stardeck-root {
-    --slide-width: 960px;
-    --slide-height: 540px;
-    --aspect-ratio: 16/9;
-}
+# Slide dimensions (16:9 aspect ratio)
+SLIDE_WIDTH = 960
+SLIDE_HEIGHT = 540
+NAV_BAR_HEIGHT = 100
+SCALE_FACTOR = 0.85
 
-.deck-container {
+DECK_STYLES = f"""
+.stardeck-root {{
+    --slide-width: {SLIDE_WIDTH}px;
+    --slide-height: {SLIDE_HEIGHT}px;
+    --aspect-ratio: 16/9;
+}}
+
+.deck-container {{
     width: 100vw;
     height: 100vh;
     display: flex;
@@ -37,9 +43,9 @@ DECK_STYLES = """
     justify-content: center;
     background: #1a1a1a;
     overflow: hidden;
-}
+}}
 
-.slide-viewport {
+.slide-viewport {{
     width: var(--slide-width);
     height: var(--slide-height);
     background: white;
@@ -48,33 +54,33 @@ DECK_STYLES = """
     position: relative;
     transform-origin: center center;
     transition: transform 0.1s ease-out;
-}
+}}
 
-.slide {
+.slide {{
     width: 100%;
     height: 100%;
     padding: 3rem;
     display: flex;
     flex-direction: column;
-}
+}}
 
-.slide-content {
+.slide-content {{
     flex: 1;
     display: flex;
     flex-direction: column;
-}
+}}
 
-.layout-cover {
+.layout-cover {{
     justify-content: center;
     align-items: center;
     text-align: center;
-}
+}}
 
-.layout-default {
+.layout-default {{
     justify-content: flex-start;
-}
+}}
 
-.navigation-bar {
+.navigation-bar {{
     position: fixed;
     bottom: 2rem;
     left: 50%;
@@ -86,9 +92,9 @@ DECK_STYLES = """
     background: rgba(0, 0, 0, 0.8);
     border-radius: 0.5rem;
     color: white;
-}
+}}
 
-.nav-btn {
+.nav-btn {{
     width: 2.5rem;
     height: 2.5rem;
     display: flex;
@@ -100,40 +106,40 @@ DECK_STYLES = """
     color: white;
     cursor: pointer;
     transition: all 0.2s;
-}
+}}
 
-.nav-btn:hover:not(:disabled) {
+.nav-btn:hover:not(:disabled) {{
     background: rgba(255, 255, 255, 0.1);
     border-color: white;
-}
+}}
 
-.nav-btn:disabled {
+.nav-btn:disabled {{
     opacity: 0.3;
     cursor: not-allowed;
-}
+}}
 
-.slide-counter {
+.slide-counter {{
     font-variant-numeric: tabular-nums;
     min-width: 4rem;
     text-align: center;
-}
+}}
 
 /* Transitions */
-.transition-fade {
+.transition-fade {{
     animation: fadeIn 0.3s ease-out;
-}
+}}
 
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
+@keyframes fadeIn {{
+    from {{ opacity: 0; }}
+    to {{ opacity: 1; }}
+}}
 
 /* Code blocks */
-.code-block {
+.code-block {{
     font-family: 'Fira Code', 'Consolas', monospace;
     font-size: 0.875rem;
     line-height: 1.5;
-}
+}}
 """
 
 
@@ -196,8 +202,8 @@ def create_app(deck_path: Path, *, debug: bool = False):
                 ),
                 id="deck-container",
                 cls="deck-container",
-                # Calculate scale on resize: min(width/960, height/540) * 0.85
-                data_resize="$scale = Math.min($resize_window_width / 960, ($resize_window_height - 100) / 540) * 0.85",
+                # Calculate scale on resize to fit slide in viewport
+                data_resize=f"$scale = Math.min($resize_window_width / {SLIDE_WIDTH}, ($resize_window_height - {NAV_BAR_HEIGHT}) / {SLIDE_HEIGHT}) * {SCALE_FACTOR}",
             ),
             # Keyboard navigation (window-level)
             Span(

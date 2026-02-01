@@ -9,21 +9,42 @@ from markdown_it import MarkdownIt
 from stardeck.models import Deck, DeckConfig, SlideInfo
 
 
-def split_slides(content: str) -> list[tuple[str, int, int]]:
-    """Split markdown content into slides by --- delimiter.
+def _is_slide_delimiter(line: str) -> bool:
+    """Check if line is a slide delimiter (--- at start of line)."""
+    return bool(re.match(r"^---\s*$", line))
 
-    Returns list of (content, start_line, end_line) tuples.
-    Only splits on --- that appears at the start of a line.
+
+def _extract_frontmatter_lines(lines: list[str]) -> int:
+    """Extract frontmatter block from start of file.
+
+    Returns the index of the line after the closing ---.
+    If no valid frontmatter, returns 0.
     """
-    lines = content.split("\n")
+    if not lines or lines[0].strip() != "---":
+        return 0
+
+    # Find the closing ---
+    for i, line in enumerate(lines[1:], start=1):
+        if line.strip() == "---":
+            return i + 1
+
+    return 0  # No closing --- found
+
+
+def _process_lines_into_slides(
+    lines: list[str],
+    start_idx: int,
+    initial_lines: list[str],
+    initial_start: int,
+) -> list[tuple[str, int, int]]:
+    """Process lines into slide tuples starting from given index."""
     slides: list[tuple[str, int, int]] = []
+    current_lines = initial_lines.copy()
+    start_line = initial_start
 
-    current_lines: list[str] = []
-    start_line = 0
-
-    for i, line in enumerate(lines):
-        if line.strip() == "---" and re.match(r"^---\s*$", line):
-            # Found delimiter - save current slide
+    for i, line in enumerate(lines[start_idx:], start=start_idx):
+        if _is_slide_delimiter(line):
+            # Save current slide
             slide_content = "\n".join(current_lines)
             end_line = i - 1 if current_lines else i
             slides.append((slide_content, start_line, max(start_line, end_line)))
@@ -41,6 +62,28 @@ def split_slides(content: str) -> list[tuple[str, int, int]]:
         slides.append((slide_content, start_line, end_line))
 
     return slides
+
+
+def split_slides(content: str) -> list[tuple[str, int, int]]:
+    """Split markdown content into slides by --- delimiter.
+
+    Returns list of (content, start_line, end_line) tuples.
+    Only splits on --- that appears at the start of a line.
+
+    If the file starts with ---, the first --- and content up to the next ---
+    is treated as frontmatter for the first slide (not a delimiter).
+    """
+    lines = content.split("\n")
+
+    # Handle frontmatter at start of file
+    frontmatter_end = _extract_frontmatter_lines(lines)
+    if frontmatter_end > 0:
+        # Include frontmatter in first slide
+        initial_lines = lines[:frontmatter_end]
+        return _process_lines_into_slides(lines, frontmatter_end, initial_lines, 0)
+
+    # No frontmatter - process from beginning
+    return _process_lines_into_slides(lines, 0, [], 0)
 
 
 def parse_frontmatter(raw: str) -> tuple[dict, str]:
