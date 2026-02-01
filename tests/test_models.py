@@ -1,6 +1,8 @@
 """Tests for stardeck models."""
 
-from stardeck.models import DeckConfig, SlideInfo
+from pathlib import Path
+
+from stardeck.models import Deck, DeckConfig, SlideInfo
 
 
 def test_slide_info_basic():
@@ -91,3 +93,24 @@ def test_deck_config_frozen():
         assert False, "Should not allow mutation"
     except AttributeError:
         pass  # Expected
+
+
+def test_deck_total():
+    """Deck should report total number of slides."""
+    slides = [
+        SlideInfo(content="<h1>One</h1>", raw="# One", index=0, start_line=0, end_line=1),
+        SlideInfo(content="<h1>Two</h1>", raw="# Two", index=1, start_line=2, end_line=3),
+    ]
+    deck = Deck(slides=slides, config=DeckConfig(), filepath=Path("test.md"), raw="# One\n---\n# Two")
+    assert deck.total == 2
+
+
+def test_deck_get_slide():
+    """Deck should allow access to slides by index."""
+    slides = [
+        SlideInfo(content="<h1>One</h1>", raw="# One", index=0, start_line=0, end_line=1),
+        SlideInfo(content="<h1>Two</h1>", raw="# Two", index=1, start_line=2, end_line=3),
+    ]
+    deck = Deck(slides=slides, config=DeckConfig(), filepath=Path("test.md"), raw="# One\n---\n# Two")
+    assert deck.slides[0].raw == "# One"
+    assert deck.slides[1].raw == "# Two"

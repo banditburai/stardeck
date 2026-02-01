@@ -1,6 +1,7 @@
 """Data models for StarDeck."""
 
 from dataclasses import dataclass, field
+from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -38,3 +39,17 @@ class DeckConfig:
     aspect_ratio: str = "16/9"
     transition: str = "fade"
     code_theme: str = "monokai"
+
+
+@dataclass
+class Deck:
+    """A complete slide deck with slides, config, and metadata."""
+
+    slides: list[SlideInfo]
+    config: DeckConfig
+    filepath: Path
+    raw: str
+
+    @property
+    def total(self) -> int:
+        return len(self.slides)
