@@ -1,8 +1,12 @@
 """Markdown parser for StarDeck."""
 
 import re
+from pathlib import Path
 
 import yaml
+from markdown_it import MarkdownIt
+
+from stardeck.models import Deck, DeckConfig, SlideInfo
 
 
 def split_slides(content: str) -> list[tuple[str, int, int]]:
@@ -97,3 +101,45 @@ def extract_notes(content: str) -> tuple[str, str]:
     result = re.sub(pattern, "", content, flags=re.DOTALL).strip()
 
     return result, notes
+
+
+def parse_deck(filepath: Path) -> Deck:
+    """Parse a markdown file into a Deck.
+
+    Combines split_slides, parse_frontmatter, extract_notes,
+    and markdown-it-py rendering.
+    """
+    raw_content = filepath.read_text()
+    md = MarkdownIt()
+
+    # Split into raw slides
+    raw_slides = split_slides(raw_content)
+
+    slides: list[SlideInfo] = []
+    for idx, (raw, start_line, end_line) in enumerate(raw_slides):
+        # Extract frontmatter
+        frontmatter, content = parse_frontmatter(raw)
+
+        # Extract notes
+        content, note = extract_notes(content)
+
+        # Render markdown to HTML
+        html_content = md.render(content)
+
+        slide = SlideInfo(
+            content=html_content,
+            raw=raw,
+            index=idx,
+            start_line=start_line,
+            end_line=end_line,
+            frontmatter=frontmatter,
+            note=note,
+        )
+        slides.append(slide)
+
+    return Deck(
+        slides=slides,
+        config=DeckConfig(),
+        filepath=filepath,
+        raw=raw_content,
+    )
