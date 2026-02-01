@@ -27,3 +27,14 @@ class SlideInfo:
     @property
     def background(self) -> str | None:
         return self.frontmatter.get("background")
+
+
+@dataclass(frozen=True)
+class DeckConfig:
+    """Configuration for the entire slide deck."""
+
+    title: str = "Untitled"
+    theme: str = "default"
+    aspect_ratio: str = "16/9"
+    transition: str = "fade"
+    code_theme: str = "monokai"
