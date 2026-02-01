@@ -19,6 +19,9 @@ test = [
     "pytest-asyncio",
 ]
 
+[project.scripts]
+stardeck = "stardeck.cli:cli"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
