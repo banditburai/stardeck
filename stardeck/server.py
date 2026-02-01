@@ -15,6 +15,8 @@ from starhtml import (
     sse,
     star_app,
 )
+from starhtml.datastar import evt
+from starhtml.plugins import resize
 
 from stardeck.parser import parse_deck
 from stardeck.renderer import render_slide
@@ -44,6 +46,8 @@ DECK_STYLES = """
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
     overflow: hidden;
     position: relative;
+    transform-origin: center center;
+    transition: transform 0.1s ease-out;
 }
 
 .slide {
@@ -153,19 +157,22 @@ def create_app(deck_path: Path, *, debug: bool = False):
         ],
         live=debug,
     )
+    app.register(resize)
 
     @rt("/")
     def home():
         return Div(
             (slide_index := Signal("slide_index", 0)),
             (total_slides := Signal("total_slides", deck.total)),
+            (scale := Signal("scale", 1.0)),
             # Main presentation container
             Div(
-                # Slide viewport
+                # Slide viewport with dynamic scaling
                 Div(
                     render_slide(deck.slides[0], deck),
                     id="slide-content",
                     cls="slide-viewport",
+                    data_style="{transform: `scale(${" + scale.to_js() + "})`}",
                 ),
                 # Navigation controls
                 Div(
@@ -189,6 +196,20 @@ def create_app(deck_path: Path, *, debug: bool = False):
                 ),
                 id="deck-container",
                 cls="deck-container",
+                # Calculate scale on resize: min(width/960, height/540) * 0.85
+                data_resize="$scale = Math.min($resize_window_width / 960, ($resize_window_height - 100) / 540) * 0.85",
+            ),
+            # Keyboard navigation (window-level)
+            Span(
+                data_on_keydown=(
+                    [
+                        (evt.key == "ArrowRight") & get("/api/slide/next"),
+                        (evt.key == " ") & get("/api/slide/next"),
+                        (evt.key == "ArrowLeft") & get("/api/slide/prev"),
+                    ],
+                    {"window": True},
+                ),
+                style="display: none",
             ),
             cls="stardeck-root",
         )
@@ -198,20 +219,20 @@ def create_app(deck_path: Path, *, debug: bool = False):
     def next_slide(slide_index: int = 0):
         new_idx = min(slide_index + 1, deck.total - 1)
         yield signals(slide_index=new_idx)
-        yield elements(render_slide(deck.slides[new_idx], deck), "#slide-content")
+        yield elements(render_slide(deck.slides[new_idx], deck), "#slide-content", "inner")
 
     @rt("/api/slide/prev")
     @sse
     def prev_slide(slide_index: int = 0):
         new_idx = max(slide_index - 1, 0)
         yield signals(slide_index=new_idx)
-        yield elements(render_slide(deck.slides[new_idx], deck), "#slide-content")
+        yield elements(render_slide(deck.slides[new_idx], deck), "#slide-content", "inner")
 
     @rt("/api/slide/{idx}")
     @sse
     def goto_slide(idx: int):
         idx = max(0, min(idx, deck.total - 1))
         yield signals(slide_index=idx)
-        yield elements(render_slide(deck.slides[idx], deck), "#slide-content")
+        yield elements(render_slide(deck.slides[idx], deck), "#slide-content", "inner")
 
     return app, rt, deck
