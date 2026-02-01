@@ -5,6 +5,8 @@ from pygments.formatters import HtmlFormatter
 from pygments.lexers import get_lexer_by_name, guess_lexer
 from starhtml import Div, NotStr
 
+from stardeck.models import Deck, SlideInfo
+
 
 def render_code_block(code: str, language: str = "") -> Div:
     """Render a code block with syntax highlighting.
@@ -30,4 +32,28 @@ def render_code_block(code: str, language: str = "") -> Div:
     return Div(
         NotStr(f"<pre><code>{highlighted}</code></pre>"),
         cls="code-block",
+    )
+
+
+def render_slide(slide: SlideInfo, deck: Deck) -> Div:
+    """Render a slide with layout classes and styling.
+
+    Wraps content in StarHTML Div with slide-{index} and layout-{layout} classes.
+    Applies background if specified in frontmatter.
+    """
+    classes = [
+        f"slide-{slide.index}",
+        f"layout-{slide.layout}",
+        "slide",
+    ]
+
+    # Build style for background
+    style = ""
+    if slide.background:
+        style = f"background-image: url('{slide.background}'); background-size: cover;"
+
+    return Div(
+        NotStr(slide.content),
+        cls=" ".join(classes),
+        style=style if style else None,
     )
