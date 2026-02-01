@@ -2,6 +2,21 @@
 
 from pathlib import Path
 
+import pytest
+from starlette.testclient import TestClient
+
+
+@pytest.fixture
+def client(tmp_path: Path):
+    """Create a test client with a simple deck."""
+    from stardeck.server import create_app
+
+    md_file = tmp_path / "slides.md"
+    md_file.write_text("# Slide 1\n---\n# Slide 2\n---\n# Slide 3")
+
+    app, rt, deck = create_app(md_file)
+    return TestClient(app)
+
 
 def test_create_app(tmp_path: Path):
     """Test that create_app returns app, rt, and deck tuple."""
@@ -15,3 +30,24 @@ def test_create_app(tmp_path: Path):
     assert deck.total == 1
     assert app is not None
     assert rt is not None
+
+
+def test_next_slide_endpoint(client: TestClient):
+    """Test that /api/slide/next returns SSE with updated slide."""
+    response = client.get("/api/slide/next")
+    assert response.status_code == 200
+    assert "text/event-stream" in response.headers["content-type"]
+
+
+def test_prev_slide_endpoint(client: TestClient):
+    """Test that /api/slide/prev returns SSE with updated slide."""
+    response = client.get("/api/slide/prev")
+    assert response.status_code == 200
+    assert "text/event-stream" in response.headers["content-type"]
+
+
+def test_goto_slide_endpoint(client: TestClient):
+    """Test that /api/slide/{idx} returns SSE with specific slide."""
+    response = client.get("/api/slide/2")
+    assert response.status_code == 200
+    assert "text/event-stream" in response.headers["content-type"]

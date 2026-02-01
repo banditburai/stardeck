@@ -2,7 +2,19 @@
 
 from pathlib import Path
 
-from starhtml import Button, Div, Script, Signal, Span, Style, star_app
+from starhtml import (
+    Button,
+    Div,
+    Script,
+    Signal,
+    Span,
+    Style,
+    elements,
+    get,
+    signals,
+    sse,
+    star_app,
+)
 
 from stardeck.parser import parse_deck
 from stardeck.renderer import render_slide
@@ -160,6 +172,7 @@ def create_app(deck_path: Path, *, debug: bool = False):
                     Button(
                         "←",
                         cls="nav-btn",
+                        data_on_click=get("/api/slide/prev"),
                         data_attr_disabled=slide_index == 0,
                     ),
                     Span(
@@ -169,6 +182,7 @@ def create_app(deck_path: Path, *, debug: bool = False):
                     Button(
                         "→",
                         cls="nav-btn",
+                        data_on_click=get("/api/slide/next"),
                         data_attr_disabled=slide_index == total_slides - 1,
                     ),
                     cls="navigation-bar",
@@ -178,5 +192,26 @@ def create_app(deck_path: Path, *, debug: bool = False):
             ),
             cls="stardeck-root",
         )
+
+    @rt("/api/slide/next")
+    @sse
+    def next_slide(slide_index: int = 0):
+        new_idx = min(slide_index + 1, deck.total - 1)
+        yield signals(slide_index=new_idx)
+        yield elements(render_slide(deck.slides[new_idx], deck), "#slide-content")
+
+    @rt("/api/slide/prev")
+    @sse
+    def prev_slide(slide_index: int = 0):
+        new_idx = max(slide_index - 1, 0)
+        yield signals(slide_index=new_idx)
+        yield elements(render_slide(deck.slides[new_idx], deck), "#slide-content")
+
+    @rt("/api/slide/{idx}")
+    @sse
+    def goto_slide(idx: int):
+        idx = max(0, min(idx, deck.total - 1))
+        yield signals(slide_index=idx)
+        yield elements(render_slide(deck.slides[idx], deck), "#slide-content")
 
     return app, rt, deck
