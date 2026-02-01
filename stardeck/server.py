@@ -50,20 +50,23 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default"):
         return Div(
             (slide_index := Signal("slide_index", 0)),
             (total_slides := Signal("total_slides", deck.total)),
-            # URL hash navigation on load
-            Script(f"""
-                setTimeout(function() {{
-                    var hash = window.location.hash;
-                    if (hash && hash.length > 1) {{
-                        var slideNum = parseInt(hash.substring(1), 10);
-                        if (!isNaN(slideNum) && slideNum >= 1 && slideNum <= {deck.total}) {{
-                            var idx = slideNum - 1;
-                            var params = encodeURIComponent(JSON.stringify({{slide_index: 0, total_slides: {deck.total}}}));
-                            new EventSource('/api/slide/' + idx + '?datastar=' + params);
-                        }}
-                    }}
-                }}, 100);
-            """),
+            (_hash_checked := Signal("_hash_checked", False)),  # Local signal (DS-006)
+            # URL hash navigation on load - uses Datastar's load event and @get action
+            Span(
+                data_on_load="""
+                    if (!$_hash_checked) {
+                        $_hash_checked = true;
+                        const hash = window.location.hash;
+                        if (hash && hash.length > 1) {
+                            const slideNum = parseInt(hash.substring(1), 10);
+                            if (!isNaN(slideNum) && slideNum >= 1 && slideNum <= $total_slides) {
+                                @get('/api/slide/' + (slideNum - 1));
+                            }
+                        }
+                    }
+                """,
+                style="display: none",
+            ),
             # Slide viewport (full screen)
             Div(
                 render_slide(deck.slides[0], deck),
