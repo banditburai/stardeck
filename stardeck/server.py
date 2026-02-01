@@ -105,6 +105,11 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default"):
                 ),
                 style="display: none",
             ),
+            # URL hash update on navigation - uses Datastar effect (DS-005)
+            Span(
+                data_effect="window.history.replaceState(null, '', '#' + ($slide_index + 1))",
+                style="display: none",
+            ),
             cls="stardeck-root",
         )
 
