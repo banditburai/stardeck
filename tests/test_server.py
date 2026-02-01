@@ -58,3 +58,46 @@ def test_reload_endpoint(client: TestClient):
     response = client.get("/api/reload")
     assert response.status_code == 200
     assert "text/event-stream" in response.headers["content-type"]
+
+
+def test_watch_status_endpoint(tmp_path: Path):
+    """Test that /api/watch-status returns timestamp for polling."""
+    from stardeck.server import create_app
+
+    md_file = tmp_path / "slides.md"
+    md_file.write_text("# Test Slide")
+
+    app, rt, deck_state = create_app(md_file, watch=True)
+    client = TestClient(app)
+
+    response = client.get("/api/watch-status")
+    assert response.status_code == 200
+    data = response.json()
+    assert "timestamp" in data
+    assert isinstance(data["timestamp"], int)
+    assert data["timestamp"] > 0
+
+
+def test_watch_status_updates_on_file_change(tmp_path: Path):
+    """Test that watch timestamp changes when updated."""
+    from stardeck.server import create_app
+
+    md_file = tmp_path / "slides.md"
+    md_file.write_text("# Test Slide")
+
+    app, rt, deck_state = create_app(md_file, watch=True)
+    client = TestClient(app)
+
+    # Get initial timestamp
+    response1 = client.get("/api/watch-status")
+    timestamp1 = response1.json()["timestamp"]
+
+    # Simulate file change by updating reload_timestamp
+    import time
+    deck_state["reload_timestamp"] = int(time.time() * 1000) + 1000
+
+    # Get new timestamp
+    response2 = client.get("/api/watch-status")
+    timestamp2 = response2.json()["timestamp"]
+
+    assert timestamp2 > timestamp1

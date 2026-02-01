@@ -1,5 +1,6 @@
 """StarDeck server application."""
 
+import time
 from pathlib import Path
 
 from starhtml import (
@@ -16,25 +17,33 @@ from starhtml import (
     star_app,
 )
 from starhtml.datastar import evt
+from starlette.responses import JSONResponse
 
 from stardeck.parser import parse_deck
 from stardeck.renderer import render_slide
 from stardeck.themes import get_theme_css
 
 
-def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default"):
+def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default", watch: bool = False):
     """Create a StarDeck application.
 
     Args:
         deck_path: Path to the markdown file.
         debug: Enable debug mode.
         theme: Theme name to use (default: "default").
+        watch: Enable watch mode for hot reload on file changes.
 
     Returns:
         Tuple of (app, route_decorator, deck_state).
     """
     # Use mutable container so deck can be re-parsed on reload
-    deck_state = {"deck": parse_deck(deck_path), "path": deck_path}
+    # reload_timestamp is used by watch mode to detect file changes
+    deck_state = {
+        "deck": parse_deck(deck_path),
+        "path": deck_path,
+        "watch": watch,
+        "reload_timestamp": int(time.time() * 1000),
+    }
     theme_css = get_theme_css(theme)
 
     deck = deck_state["deck"]  # Initial deck reference
@@ -113,6 +122,23 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default"):
                 data_effect="window.history.replaceState(null, '', '#' + ($slide_index + 1))",
                 style="display: none",
             ),
+            # Watch mode polling for hot reload (only when watch=True)
+            Span(
+                (_watch_ts := Signal("_watch_ts", deck_state["reload_timestamp"])),
+                data_on_load="""
+                    setInterval(async () => {
+                        try {
+                            const response = await fetch('/api/watch-status');
+                            const data = await response.json();
+                            if (data.timestamp > $_watch_ts) {
+                                $_watch_ts = data.timestamp;
+                                @get('/api/reload');
+                            }
+                        } catch (e) {}
+                    }, 1000);
+                """,
+                style="display: none",
+            ) if deck_state.get("watch") else None,
             cls="stardeck-root",
         )
 
@@ -149,5 +175,10 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default"):
         idx = min(slide_index, current_deck.total - 1)
         yield signals(slide_index=idx, total_slides=current_deck.total)
         yield elements(render_slide(current_deck.slides[idx], current_deck), "#slide-content", "inner")
+
+    @rt("/api/watch-status")
+    def watch_status():
+        """Return current reload timestamp for watch mode polling."""
+        return JSONResponse({"timestamp": deck_state.get("reload_timestamp", 0)})
 
     return app, rt, deck_state
