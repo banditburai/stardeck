@@ -1,5 +1,6 @@
 """Watch mode file detection for StarDeck."""
 
+import asyncio
 from pathlib import Path
 from typing import Callable
 
@@ -18,21 +19,19 @@ class FileWatcher:
         """
         self.path = path
         self.on_change = on_change
-        self._running = False
+        self._stop_event = asyncio.Event()
 
-    async def start(self):
+    async def start(self) -> None:
         """Start watching the file for changes."""
-        self._running = True
-        async for changes in awatch(self.path):
-            if not self._running:
-                break
-            for change_type, changed_path in changes:
+        self._stop_event.clear()
+        async for changes in awatch(self.path, stop_event=self._stop_event):
+            for _, changed_path in changes:
                 if Path(changed_path) == self.path:
                     self.on_change()
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop watching the file."""
-        self._running = False
+        self._stop_event.set()
 
 
 def create_file_watcher(path: Path, on_change: Callable[[], None]) -> FileWatcher:
