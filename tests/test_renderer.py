@@ -199,3 +199,66 @@ def test_render_slide_uses_deck_transition_fallback():
     result = render_slide(slide, deck)
     result_str = to_xml(result)
     assert "transition-zoom" in result_str
+
+
+def test_render_slide_transition_slide_right():
+    """render_slide should apply slide-right transition class."""
+    slide = SlideInfo(
+        content="<h1>Hi</h1>",
+        raw="# Hi",
+        index=0,
+        start_line=0,
+        end_line=1,
+        frontmatter={"transition": "slide-right"},
+    )
+    deck = Deck(
+        slides=[slide],
+        config=DeckConfig(),
+        filepath=Path("test.md"),
+        raw="# Hi",
+    )
+    result = render_slide(slide, deck)
+    result_str = to_xml(result)
+    assert "transition-slide-right" in result_str
+
+
+def test_render_slide_transition_slide_up():
+    """render_slide should apply slide-up transition class."""
+    slide = SlideInfo(
+        content="<h1>Hi</h1>",
+        raw="# Hi",
+        index=0,
+        start_line=0,
+        end_line=1,
+        frontmatter={"transition": "slide-up"},
+    )
+    deck = Deck(
+        slides=[slide],
+        config=DeckConfig(),
+        filepath=Path("test.md"),
+        raw="# Hi",
+    )
+    result = render_slide(slide, deck)
+    result_str = to_xml(result)
+    assert "transition-slide-up" in result_str
+
+
+def test_render_slide_transition_slide_down():
+    """render_slide should apply slide-down transition class."""
+    slide = SlideInfo(
+        content="<h1>Hi</h1>",
+        raw="# Hi",
+        index=0,
+        start_line=0,
+        end_line=1,
+        frontmatter={"transition": "slide-down"},
+    )
+    deck = Deck(
+        slides=[slide],
+        config=DeckConfig(),
+        filepath=Path("test.md"),
+        raw="# Hi",
+    )
+    result = render_slide(slide, deck)
+    result_str = to_xml(result)
+    assert "transition-slide-down" in result_str
