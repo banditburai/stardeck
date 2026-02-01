@@ -1,6 +1,6 @@
 """Tests for stardeck parser."""
 
-from stardeck.parser import parse_frontmatter, split_slides
+from stardeck.parser import extract_notes, parse_frontmatter, split_slides
 
 
 def test_split_slides_basic():
@@ -79,3 +79,36 @@ def test_parse_frontmatter_empty():
     fm, content = parse_frontmatter(raw)
     assert fm == {}
     assert content == "# Title"
+
+
+def test_extract_notes():
+    """extract_notes should extract speaker notes from HTML comments."""
+    content = "# Slide\n<!-- notes\nSpeaker notes here\n-->"
+    result, notes = extract_notes(content)
+    assert "Speaker notes here" in notes
+    assert "<!--" not in result
+
+
+def test_extract_notes_no_notes():
+    """extract_notes should handle content without notes."""
+    content = "# Slide\nNo notes here"
+    result, notes = extract_notes(content)
+    assert notes == ""
+    assert result == content
+
+
+def test_extract_notes_regular_comments():
+    """extract_notes should preserve regular HTML comments."""
+    content = "# Slide\n<!-- regular comment -->\n<!-- notes\nSpeaker notes\n-->"
+    result, notes = extract_notes(content)
+    assert "regular comment" in result
+    assert "Speaker notes" in notes
+
+
+def test_extract_notes_multiline():
+    """extract_notes should handle multiline notes."""
+    content = "# Slide\n<!-- notes\nLine 1\nLine 2\nLine 3\n-->"
+    result, notes = extract_notes(content)
+    assert "Line 1" in notes
+    assert "Line 2" in notes
+    assert "Line 3" in notes

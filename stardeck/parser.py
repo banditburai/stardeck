@@ -75,3 +75,25 @@ def parse_frontmatter(raw: str) -> tuple[dict, str]:
         frontmatter = {}
 
     return frontmatter, remaining
+
+
+def extract_notes(content: str) -> tuple[str, str]:
+    """Extract speaker notes from HTML comments.
+
+    Looks for <!-- notes ... --> blocks and extracts the content.
+    Returns (content_without_notes, notes_text).
+    """
+    # Pattern to match <!-- notes ... --> blocks
+    pattern = r"<!--\s*notes\s*\n(.*?)-->"
+
+    match = re.search(pattern, content, re.DOTALL)
+    if not match:
+        return content, ""
+
+    # Extract notes content
+    notes = match.group(1).strip()
+
+    # Remove the notes block from content
+    result = re.sub(pattern, "", content, flags=re.DOTALL).strip()
+
+    return result, notes
