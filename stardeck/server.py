@@ -144,12 +144,9 @@ def create_app(deck_path: Path, *, debug: bool = False):
 
     @rt("/")
     def home():
-        slide_index = Signal("slide_index", 0)
-        total_slides = Signal("total_slides", deck.total)
-
         return Div(
-            slide_index,
-            total_slides,
+            (slide_index := Signal("slide_index", 0)),
+            (total_slides := Signal("total_slides", deck.total)),
             # Main presentation container
             Div(
                 # Slide viewport
