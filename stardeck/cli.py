@@ -20,12 +20,15 @@ def cli():
 @click.option("--debug", "-d", is_flag=True, help="Enable debug mode with live reload.")
 def run(slides: Path, port: int, debug: bool):
     """Run a presentation from a markdown SLIDES file."""
-    from starhtml import serve
+    import uvicorn
 
     app, rt, deck = create_app(slides, debug=debug)
-    click.echo(f"Starting StarDeck on http://127.0.0.1:{port}")
+    click.echo(f"Starting StarDeck on http://localhost:{port}")
     click.echo(f"Slides: {deck.total}")
-    serve(app, port=port, reload=debug)
+    # Use uvicorn directly for dynamic apps (created at runtime with slides path).
+    # starhtml's serve() expects a module:variable path for uvicorn reload mode,
+    # which doesn't work for apps created dynamically.
+    uvicorn.run(app, host="localhost", port=port)
 
 
 if __name__ == "__main__":

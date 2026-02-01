@@ -160,3 +160,42 @@ def test_parse_deck_stores_raw(tmp_path):
     md_file.write_text(content)
     deck = parse_deck(md_file)
     assert deck.slides[0].raw == content
+
+
+def test_split_slides_mid_deck_frontmatter():
+    """split_slides should handle Slidev-style mid-deck frontmatter."""
+    # Format: ---\nlayout: cover\n---\n# Content
+    # This should be ONE slide with frontmatter, not two slides
+    content = """# Slide 1
+---
+layout: cover
+---
+# Cover Slide
+---
+# Slide 3"""
+    result = split_slides(content)
+    # Should be 3 slides: Slide 1, Cover Slide (with frontmatter), Slide 3
+    assert len(result) == 3
+    # Second slide should contain the frontmatter
+    assert "layout: cover" in result[1][0]
+    assert "Cover Slide" in result[1][0]
+
+
+def test_parse_deck_mid_deck_frontmatter(tmp_path):
+    """parse_deck should extract frontmatter from mid-deck slides."""
+    md_file = tmp_path / "slides.md"
+    content = """# Slide 1
+---
+layout: cover
+---
+# Cover Slide
+---
+# Slide 3"""
+    md_file.write_text(content)
+    deck = parse_deck(md_file)
+    assert deck.total == 3
+    # Second slide should have cover layout
+    assert deck.slides[1].layout == "cover"
+    # Other slides should have default layout
+    assert deck.slides[0].layout == "default"
+    assert deck.slides[2].layout == "default"

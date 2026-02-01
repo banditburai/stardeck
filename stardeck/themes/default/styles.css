@@ -1,0 +1,312 @@
+/**
+ * StarDeck Default Theme
+ *
+ * A clean, dark theme with teal accents.
+ * Inspired by Slidev's aesthetic.
+ */
+
+/* CSS Variables */
+.stardeck-root {
+    --accent: #4ec5d4;
+    --accent-hover: #5ed3e1;
+    --bg-dark: #121212;
+    --bg-slide: #1e1e1e;
+    --text-primary: #e4e4e7;
+    --text-secondary: #a1a1aa;
+    --text-heading: #fafafa;
+    --border-color: rgba(255, 255, 255, 0.1);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Container */
+.deck-container {
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-dark);
+    overflow: hidden;
+}
+
+/* Slide viewport - fills browser */
+.slide-viewport {
+    width: 100vw;
+    height: 100vh;
+    background: var(--bg-slide);
+    overflow: hidden;
+    position: relative;
+}
+
+/* Slide base */
+.slide {
+    width: 100%;
+    height: 100%;
+    padding: 4rem 6rem;
+    display: flex;
+    flex-direction: column;
+    color: var(--text-primary);
+    box-sizing: border-box;
+}
+
+/* Layouts */
+.layout-cover {
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
+.layout-default {
+    justify-content: flex-start;
+}
+
+/* Typography in slides */
+.slide h1 {
+    font-size: 3rem;
+    font-weight: 700;
+    color: var(--text-heading);
+    margin: 0 0 1.5rem 0;
+    line-height: 1.2;
+}
+
+.slide h2 {
+    font-size: 2rem;
+    font-weight: 600;
+    color: var(--text-heading);
+    margin: 0 0 1.25rem 0;
+    line-height: 1.3;
+}
+
+.slide h3 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-heading);
+    margin: 0 0 1rem 0;
+}
+
+.slide p {
+    font-size: 1.25rem;
+    line-height: 1.6;
+    color: var(--text-primary);
+    margin: 0 0 1rem 0;
+}
+
+.slide em {
+    color: var(--accent);
+    font-style: italic;
+}
+
+.slide strong {
+    color: var(--text-heading);
+    font-weight: 600;
+}
+
+/* Lists */
+.slide ul, .slide ol {
+    font-size: 1.25rem;
+    line-height: 1.8;
+    padding-left: 1.5rem;
+    margin: 0 0 1rem 0;
+}
+
+.slide li {
+    margin-bottom: 0.5rem;
+}
+
+.slide ul li::marker {
+    color: var(--accent);
+}
+
+/* Code */
+.slide code {
+    font-family: 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+    background: rgba(78, 197, 212, 0.15);
+    color: var(--accent);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.slide pre {
+    background: #0d0d0d;
+    border-radius: 8px;
+    padding: 1.25rem;
+    overflow-x: auto;
+    margin: 1rem 0;
+    border: 1px solid var(--border-color);
+}
+
+.slide pre code {
+    background: transparent;
+    padding: 0;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: var(--text-primary);
+}
+
+/* Tables */
+.slide table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 1.1rem;
+}
+
+.slide th, .slide td {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.slide th {
+    font-weight: 600;
+    color: var(--text-heading);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+/* Navigation bar - bottom left */
+.navigation-bar {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    opacity: 0.5;
+    transition: opacity 0.2s;
+}
+
+.navigation-bar:hover {
+    opacity: 1;
+}
+
+.nav-btn {
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s;
+    font-size: 1rem;
+}
+
+.nav-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-heading);
+}
+
+.nav-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.slide-counter {
+    font-variant-numeric: tabular-nums;
+    font-size: 0.875rem;
+    padding: 0 0.5rem;
+    color: var(--text-secondary);
+}
+
+/* Transitions */
+.transition-fade {
+    animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Pygments code highlighting overrides */
+.code-block {
+    font-family: 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+/* Pygments syntax highlighting - Monokai-inspired dark theme */
+.slide pre code .hll { background-color: #49483e }
+.slide pre code .c { color: #75715e }  /* Comment */
+.slide pre code .k { color: #f92672 }  /* Keyword */
+.slide pre code .n { color: #f8f8f2 }  /* Name */
+.slide pre code .o { color: #f92672 }  /* Operator */
+.slide pre code .p { color: #f8f8f2 }  /* Punctuation */
+.slide pre code .cm { color: #75715e }  /* Comment.Multiline */
+.slide pre code .cp { color: #75715e }  /* Comment.Preproc */
+.slide pre code .c1 { color: #75715e }  /* Comment.Single */
+.slide pre code .cs { color: #75715e }  /* Comment.Special */
+.slide pre code .gd { color: #f92672 }  /* Generic.Deleted */
+.slide pre code .ge { font-style: italic }  /* Generic.Emph */
+.slide pre code .gi { color: #a6e22e }  /* Generic.Inserted */
+.slide pre code .gs { font-weight: bold }  /* Generic.Strong */
+.slide pre code .gu { color: #75715e }  /* Generic.Subheading */
+.slide pre code .kc { color: #66d9ef }  /* Keyword.Constant */
+.slide pre code .kd { color: #66d9ef }  /* Keyword.Declaration */
+.slide pre code .kn { color: #f92672 }  /* Keyword.Namespace */
+.slide pre code .kp { color: #66d9ef }  /* Keyword.Pseudo */
+.slide pre code .kr { color: #66d9ef }  /* Keyword.Reserved */
+.slide pre code .kt { color: #66d9ef }  /* Keyword.Type */
+.slide pre code .ld { color: #e6db74 }  /* Literal.Date */
+.slide pre code .m { color: #ae81ff }  /* Literal.Number */
+.slide pre code .s { color: #e6db74 }  /* Literal.String */
+.slide pre code .na { color: #a6e22e }  /* Name.Attribute */
+.slide pre code .nb { color: #f8f8f2 }  /* Name.Builtin */
+.slide pre code .nc { color: #a6e22e }  /* Name.Class */
+.slide pre code .no { color: #66d9ef }  /* Name.Constant */
+.slide pre code .nd { color: #a6e22e }  /* Name.Decorator */
+.slide pre code .ni { color: #f8f8f2 }  /* Name.Entity */
+.slide pre code .ne { color: #a6e22e }  /* Name.Exception */
+.slide pre code .nf { color: #a6e22e }  /* Name.Function */
+.slide pre code .nl { color: #f8f8f2 }  /* Name.Label */
+.slide pre code .nn { color: #f8f8f2 }  /* Name.Namespace */
+.slide pre code .nx { color: #a6e22e }  /* Name.Other */
+.slide pre code .py { color: #f8f8f2 }  /* Name.Property */
+.slide pre code .nt { color: #f92672 }  /* Name.Tag */
+.slide pre code .nv { color: #f8f8f2 }  /* Name.Variable */
+.slide pre code .ow { color: #f92672 }  /* Operator.Word */
+.slide pre code .w { color: #f8f8f2 }  /* Text.Whitespace */
+.slide pre code .mb { color: #ae81ff }  /* Literal.Number.Bin */
+.slide pre code .mf { color: #ae81ff }  /* Literal.Number.Float */
+.slide pre code .mh { color: #ae81ff }  /* Literal.Number.Hex */
+.slide pre code .mi { color: #ae81ff }  /* Literal.Number.Integer */
+.slide pre code .mo { color: #ae81ff }  /* Literal.Number.Oct */
+.slide pre code .sb { color: #e6db74 }  /* Literal.String.Backtick */
+.slide pre code .sc { color: #e6db74 }  /* Literal.String.Char */
+.slide pre code .sd { color: #e6db74 }  /* Literal.String.Doc */
+.slide pre code .s2 { color: #e6db74 }  /* Literal.String.Double */
+.slide pre code .se { color: #ae81ff }  /* Literal.String.Escape */
+.slide pre code .sh { color: #e6db74 }  /* Literal.String.Heredoc */
+.slide pre code .si { color: #e6db74 }  /* Literal.String.Interpol */
+.slide pre code .sx { color: #e6db74 }  /* Literal.String.Other */
+.slide pre code .sr { color: #e6db74 }  /* Literal.String.Regex */
+.slide pre code .s1 { color: #e6db74 }  /* Literal.String.Single */
+.slide pre code .ss { color: #e6db74 }  /* Literal.String.Symbol */
+.slide pre code .bp { color: #f8f8f2 }  /* Name.Builtin.Pseudo */
+.slide pre code .vc { color: #f8f8f2 }  /* Name.Variable.Class */
+.slide pre code .vg { color: #f8f8f2 }  /* Name.Variable.Global */
+.slide pre code .vi { color: #f8f8f2 }  /* Name.Variable.Instance */
+.slide pre code .il { color: #ae81ff }  /* Literal.Number.Integer.Long */
+.slide pre code .fm { color: #a6e22e }  /* Name.Function.Magic */
+
+/* Ensure colored backgrounds show correctly */
+.slide[style*="background-color"] {
+    color: white;
+}
+
+.slide[style*="background-color"] h1,
+.slide[style*="background-color"] h2,
+.slide[style*="background-color"] h3,
+.slide[style*="background-color"] p {
+    color: white;
+}

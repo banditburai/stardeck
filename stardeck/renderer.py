@@ -40,20 +40,33 @@ def render_slide(slide: SlideInfo, deck: Deck) -> Div:
 
     Wraps content in StarHTML Div with slide-{index} and layout-{layout} classes.
     Applies background if specified in frontmatter.
+    Uses slide.transition if set, otherwise falls back to deck.config.transition.
     """
+    # Determine transition: slide-specific or deck default
+    transition = slide.frontmatter.get("transition") or deck.config.transition
+
     classes = [
         f"slide-{slide.index}",
         f"layout-{slide.layout}",
+        f"transition-{transition}",
         "slide",
     ]
 
     # Build style for background
     style = ""
     if slide.background:
-        style = f"background-image: url('{slide.background}'); background-size: cover;"
+        bg = slide.background
+        if bg.startswith("#") or bg.startswith("rgb"):
+            # Color background
+            style = f"background-color: {bg};"
+        else:
+            # Image background
+            style = f"background-image: url('{bg}'); background-size: cover; background-position: center;"
 
     return Div(
         NotStr(slide.content),
+        id=f"slide-{slide.index}",
         cls=" ".join(classes),
         style=style if style else None,
+        **{"data-slide-index": slide.index},
     )

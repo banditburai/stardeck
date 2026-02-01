@@ -14,46 +14,87 @@ def _is_slide_delimiter(line: str) -> bool:
     return bool(re.match(r"^---\s*$", line))
 
 
-def _extract_frontmatter_lines(lines: list[str]) -> int:
-    """Extract frontmatter block from start of file.
+def _is_yaml_like(text: str) -> bool:
+    """Check if text looks like YAML frontmatter (key: value pairs only)."""
+    lines = [l.strip() for l in text.strip().split("\n") if l.strip()]
+    if not lines:
+        return False
+    # Check if all non-empty lines look like YAML key: value
+    for line in lines:
+        if not re.match(r"^[\w_-]+:\s*.+$", line):
+            return False
+    return True
 
-    Returns the index of the line after the closing ---.
-    If no valid frontmatter, returns 0.
+
+def _find_frontmatter_end(lines: list[str], start: int) -> int:
+    """Find the closing --- of a frontmatter block.
+
+    Returns the index of the closing ---, or -1 if not found.
     """
-    if not lines or lines[0].strip() != "---":
-        return 0
-
-    # Find the closing ---
-    for i, line in enumerate(lines[1:], start=1):
-        if line.strip() == "---":
-            return i + 1
-
-    return 0  # No closing --- found
-
-
-def _process_lines_into_slides(
-    lines: list[str],
-    start_idx: int,
-    initial_lines: list[str],
-    initial_start: int,
-) -> list[tuple[str, int, int]]:
-    """Process lines into slide tuples starting from given index."""
-    slides: list[tuple[str, int, int]] = []
-    current_lines = initial_lines.copy()
-    start_line = initial_start
-
-    for i, line in enumerate(lines[start_idx:], start=start_idx):
+    for i, line in enumerate(lines[start:], start=start):
         if _is_slide_delimiter(line):
-            # Save current slide
-            slide_content = "\n".join(current_lines)
-            end_line = i - 1 if current_lines else i
-            slides.append((slide_content, start_line, max(start_line, end_line)))
+            return i
+    return -1
 
-            # Start new slide
+
+def split_slides(content: str) -> list[tuple[str, int, int]]:
+    """Split markdown content into slides by --- delimiter.
+
+    Returns list of (content, start_line, end_line) tuples.
+
+    Handles Slidev-style frontmatter for mid-deck slides:
+    ---
+    layout: cover
+    ---
+    # Content
+
+    The above is ONE slide with frontmatter, not two slides.
+    """
+    lines = content.split("\n")
+    slides: list[tuple[str, int, int]] = []
+
+    i = 0
+    current_lines: list[str] = []
+    start_line = 0
+
+    while i < len(lines):
+        line = lines[i]
+
+        if _is_slide_delimiter(line):
+            # Check if this starts a frontmatter block
+            # Look ahead to see if there's YAML followed by another ---
+            fm_end = _find_frontmatter_end(lines, i + 1)
+
+            if fm_end > i + 1:
+                # There's content between this --- and the next ---
+                potential_yaml = "\n".join(lines[i + 1 : fm_end])
+
+                if _is_yaml_like(potential_yaml):
+                    # This is slide frontmatter, not a separate slide
+                    # Save current slide first
+                    if current_lines or slides:
+                        slide_content = "\n".join(current_lines)
+                        end_line = i - 1 if current_lines else i
+                        slides.append((slide_content, start_line, max(start_line, end_line)))
+
+                    # Start new slide with frontmatter included
+                    current_lines = lines[i : fm_end + 1]  # Include ---, yaml, ---
+                    start_line = i
+                    i = fm_end + 1
+                    continue
+
+            # Regular slide delimiter (no frontmatter follows)
+            if current_lines or slides:
+                slide_content = "\n".join(current_lines)
+                end_line = i - 1 if current_lines else i
+                slides.append((slide_content, start_line, max(start_line, end_line)))
+
             current_lines = []
             start_line = i + 1
         else:
             current_lines.append(line)
+
+        i += 1
 
     # Add final slide
     if current_lines or not slides:
@@ -62,28 +103,6 @@ def _process_lines_into_slides(
         slides.append((slide_content, start_line, end_line))
 
     return slides
-
-
-def split_slides(content: str) -> list[tuple[str, int, int]]:
-    """Split markdown content into slides by --- delimiter.
-
-    Returns list of (content, start_line, end_line) tuples.
-    Only splits on --- that appears at the start of a line.
-
-    If the file starts with ---, the first --- and content up to the next ---
-    is treated as frontmatter for the first slide (not a delimiter).
-    """
-    lines = content.split("\n")
-
-    # Handle frontmatter at start of file
-    frontmatter_end = _extract_frontmatter_lines(lines)
-    if frontmatter_end > 0:
-        # Include frontmatter in first slide
-        initial_lines = lines[:frontmatter_end]
-        return _process_lines_into_slides(lines, frontmatter_end, initial_lines, 0)
-
-    # No frontmatter - process from beginning
-    return _process_lines_into_slides(lines, 0, [], 0)
 
 
 def parse_frontmatter(raw: str) -> tuple[dict, str]:
@@ -146,6 +165,34 @@ def extract_notes(content: str) -> tuple[str, str]:
     return result, notes
 
 
+def _create_markdown_renderer() -> MarkdownIt:
+    """Create a MarkdownIt instance with Pygments syntax highlighting."""
+    from pygments import highlight
+    from pygments.formatters import HtmlFormatter
+    from pygments.lexers import get_lexer_by_name
+    from pygments.lexers.special import TextLexer
+
+    md = MarkdownIt()
+
+    # Override the fence renderer to use Pygments
+    def render_fence(self, tokens, idx, options, env):
+        token = tokens[idx]
+        code = token.content.rstrip("\n")
+        lang = token.info.strip() if token.info else ""
+
+        try:
+            lexer = get_lexer_by_name(lang) if lang else TextLexer()
+        except Exception:
+            lexer = TextLexer()
+
+        formatter = HtmlFormatter(nowrap=True)
+        highlighted = highlight(code, lexer, formatter)
+        return f'<pre><code class="language-{lang}">{highlighted}</code></pre>\n'
+
+    md.add_render_rule("fence", render_fence)
+    return md
+
+
 def parse_deck(filepath: Path) -> Deck:
     """Parse a markdown file into a Deck.
 
@@ -153,7 +200,7 @@ def parse_deck(filepath: Path) -> Deck:
     and markdown-it-py rendering.
     """
     raw_content = filepath.read_text()
-    md = MarkdownIt()
+    md = _create_markdown_renderer()
 
     # Split into raw slides
     raw_slides = split_slides(raw_content)
