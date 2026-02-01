@@ -31,10 +31,13 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default"):
         theme: Theme name to use (default: "default").
 
     Returns:
-        Tuple of (app, route_decorator, deck).
+        Tuple of (app, route_decorator, deck_state).
     """
-    deck = parse_deck(deck_path)
+    # Use mutable container so deck can be re-parsed on reload
+    deck_state = {"deck": parse_deck(deck_path), "path": deck_path}
     theme_css = get_theme_css(theme)
+
+    deck = deck_state["deck"]  # Initial deck reference
 
     app, rt = star_app(
         title=deck.config.title,
@@ -116,22 +119,35 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default"):
     @rt("/api/slide/next")
     @sse
     def next_slide(slide_index: int = 0):
-        new_idx = min(slide_index + 1, deck.total - 1)
+        current_deck = deck_state["deck"]
+        new_idx = min(slide_index + 1, current_deck.total - 1)
         yield signals(slide_index=new_idx)
-        yield elements(render_slide(deck.slides[new_idx], deck), "#slide-content", "inner")
+        yield elements(render_slide(current_deck.slides[new_idx], current_deck), "#slide-content", "inner")
 
     @rt("/api/slide/prev")
     @sse
     def prev_slide(slide_index: int = 0):
+        current_deck = deck_state["deck"]
         new_idx = max(slide_index - 1, 0)
         yield signals(slide_index=new_idx)
-        yield elements(render_slide(deck.slides[new_idx], deck), "#slide-content", "inner")
+        yield elements(render_slide(current_deck.slides[new_idx], current_deck), "#slide-content", "inner")
 
     @rt("/api/slide/{idx}")
     @sse
     def goto_slide(idx: int):
-        idx = max(0, min(idx, deck.total - 1))
+        current_deck = deck_state["deck"]
+        idx = max(0, min(idx, current_deck.total - 1))
         yield signals(slide_index=idx)
-        yield elements(render_slide(deck.slides[idx], deck), "#slide-content", "inner")
+        yield elements(render_slide(current_deck.slides[idx], current_deck), "#slide-content", "inner")
 
-    return app, rt, deck
+    @rt("/api/reload")
+    @sse
+    def reload_deck(slide_index: int = 0):
+        """Re-parse deck and re-render current slide after file change."""
+        deck_state["deck"] = parse_deck(deck_state["path"])
+        current_deck = deck_state["deck"]
+        idx = min(slide_index, current_deck.total - 1)
+        yield signals(slide_index=idx, total_slides=current_deck.total)
+        yield elements(render_slide(current_deck.slides[idx], current_deck), "#slide-content", "inner")
+
+    return app, rt, deck_state

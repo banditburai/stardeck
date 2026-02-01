@@ -22,7 +22,8 @@ def run(slides: Path, port: int, debug: bool):
     """Run a presentation from a markdown SLIDES file."""
     import uvicorn
 
-    app, rt, deck = create_app(slides, debug=debug)
+    app, rt, deck_state = create_app(slides, debug=debug)
+    deck = deck_state["deck"]
     click.echo(f"Starting StarDeck on http://localhost:{port}")
     click.echo(f"Slides: {deck.total}")
     # Use uvicorn directly for dynamic apps (created at runtime with slides path).
