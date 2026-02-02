@@ -625,3 +625,33 @@
     background: var(--accent-color);
     border-color: var(--accent-color);
 }
+
+/* Color Palette */
+.color-palette {
+    display: flex;
+    gap: 4px;
+}
+
+.color-btn {
+    width: 28px;
+    height: 28px;
+    border: 2px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, transform 0.1s ease;
+}
+
+.color-btn:hover {
+    border-color: var(--accent-color);
+    transform: scale(1.1);
+}
+
+.color-btn:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+}
+
+.color-btn.active {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px var(--bg-dark), 0 0 0 4px var(--accent-color);
+}

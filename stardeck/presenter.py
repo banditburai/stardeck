@@ -13,6 +13,9 @@ if TYPE_CHECKING:
     from stardeck.server import PresentationState
 
 
+COLORS = ["#000000", "#ffffff", "#ff0000", "#ffff00", "#00ff00", "#00ffff", "#0000ff", "#ff00ff"]
+
+
 def create_drawing_toolbar(token: str) -> Div:
     """Create drawing toolbar with tool and action buttons.
 
@@ -61,6 +64,21 @@ def create_drawing_toolbar(token: str) -> Div:
                 title="Arrow tool",
             ),
             cls="toolbar-tools",
+        ),
+        # Color palette
+        Div(
+            *[
+                Button(
+                    "",
+                    style=f"background:{c}",
+                    data_on_click=f"$stroke_color = '{c}'",
+                    cls="color-btn",
+                    data_class_active=f"$stroke_color === '{c}'",
+                    title=c,
+                )
+                for c in COLORS
+            ],
+            cls="color-palette",
         ),
         # Actions
         Div(
@@ -122,8 +140,10 @@ def create_presenter_view(
         (max_clicks := Signal("max_clicks", current_slide.max_clicks)),
         # Elapsed timer signal
         (elapsed := Signal("elapsed", 0)),
-        # Drawing tool signal
+        # Drawing signals
         Signal("drawing_tool", "pen"),
+        Signal("stroke_color", "#ff0000"),
+        Signal("stroke_width", 2),
         # Timer increment (every second) - hidden element
         Span(
             data_on_interval=(
