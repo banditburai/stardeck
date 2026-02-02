@@ -62,18 +62,14 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default", 
         return Div(
             (slide_index := Signal("slide_index", 0)),
             (total_slides := Signal("total_slides", deck.total)),
-            (_hash_checked := Signal("_hash_checked", False)),  # Local signal (DS-006)
-            # URL hash navigation on load - uses Datastar's load event and @get action
+            # URL hash navigation on load - uses Datastar's data-on:load
             Span(
                 data_on_load="""
-                    if (!$_hash_checked) {
-                        $_hash_checked = true;
-                        const hash = window.location.hash;
-                        if (hash && hash.length > 1) {
-                            const slideNum = parseInt(hash.substring(1), 10);
-                            if (!isNaN(slideNum) && slideNum >= 1 && slideNum <= $total_slides) {
-                                @get('/api/slide/' + (slideNum - 1));
-                            }
+                    const hash = window.location.hash;
+                    if (hash && hash.length > 1) {
+                        const slideNum = parseInt(hash.substring(1), 10);
+                        if (!isNaN(slideNum) && slideNum >= 1 && slideNum <= $total_slides) {
+                            @get('/api/slide/' + (slideNum - 1))
                         }
                     }
                 """,
@@ -125,18 +121,19 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default", 
             # Watch mode polling for hot reload (only when watch=True)
             Span(
                 (_watch_ts := Signal("_watch_ts", deck_state["reload_timestamp"])),
-                data_on_load="""
-                    setInterval(async () => {
-                        try {
-                            const response = await fetch('/api/watch-status');
-                            const data = await response.json();
+                data_on_interval=(
+                    """
+                    fetch('/api/watch-status')
+                        .then(r => r.json())
+                        .then(data => {
                             if (data.timestamp > $_watch_ts) {
                                 $_watch_ts = data.timestamp;
-                                @get('/api/reload');
+                                @get('/api/reload')
                             }
-                        } catch (e) {}
-                    }, 1000);
-                """,
+                        })
+                    """,
+                    {"duration": "1s"},
+                ),
                 style="display: none",
             ) if deck_state.get("watch") else None,
             cls="stardeck-root",
