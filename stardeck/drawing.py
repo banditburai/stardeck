@@ -144,12 +144,18 @@ def element_to_svg(element: DrawingElement) -> str:
         if len(element.points) < 2:
             return ""
         start, end = element.points[0], element.points[1]
+        markers = ""
+        if element.start_arrow:
+            markers += 'marker-start="url(#arrow)" '
+        if element.end_arrow:
+            markers += 'marker-end="url(#arrow)" '
         return (
             f'<line id="{element.id}" '
             f'x1="{start.x}" y1="{start.y}" '
             f'x2="{end.x}" y2="{end.y}" '
             f'stroke="{element.stroke_color}" '
-            f'stroke-width="{element.stroke_width}" />'
+            f'stroke-width="{element.stroke_width}" '
+            f'{markers}/>'
         )
 
     if isinstance(element, ShapeElement):

@@ -269,6 +269,25 @@ def test_ellipse_element_to_svg():
     assert 'stroke="#ff00ff"' in svg
 
 
+def test_arrow_element_to_svg():
+    """LineElement with end_arrow=True should include marker-end attribute."""
+    from stardeck.drawing import LineElement, Point, element_to_svg
+
+    element = LineElement(
+        id="arrow-1",
+        type="arrow",
+        stroke_color="#000000",
+        stroke_width=2,
+        points=[Point(10, 50), Point(90, 50)],
+        start_arrow=False,
+        end_arrow=True,
+        slide_index=0,
+    )
+    svg = element_to_svg(element)
+    assert "<line" in svg
+    assert "marker-end" in svg  # Arrow marker reference
+
+
 def test_presentation_state_has_drawing(tmp_path: Path):
     """PresentationState should include DrawingState for annotations."""
     from stardeck.server import create_app
