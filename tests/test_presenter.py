@@ -59,3 +59,10 @@ def test_presenter_shows_speaker_notes(tmp_path: Path):
     response = client.get("/presenter")
     # Verify the actual note content appears in the response
     assert "These are my speaker notes" in response.text
+
+
+def test_presenter_has_timer(client: TestClient):
+    """Test that presenter view has an elapsed timer."""
+    response = client.get("/presenter")
+    html = response.text
+    assert "timer" in html.lower() or "elapsed" in html.lower()

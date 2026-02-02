@@ -1,6 +1,6 @@
 """Presenter mode view for StarDeck."""
 
-from starhtml import Div, H3
+from starhtml import Div, H3, Signal, Span
 
 from stardeck.models import Deck
 from stardeck.renderer import render_slide
@@ -20,6 +20,16 @@ def create_presenter_view(deck: Deck, slide_index: int = 0) -> Div:
     next_slide = deck.slides[slide_index + 1] if slide_index + 1 < deck.total else None
 
     return Div(
+        # Elapsed timer signal
+        (elapsed := Signal("elapsed", 0)),
+        # Timer increment (every second) - hidden element
+        Span(
+            data_on_interval=(
+                "$elapsed++",
+                {"duration": "1s"},
+            ),
+            style="display: none",
+        ),
         # Main layout - two panels
         Div(
             # Current slide panel
@@ -39,6 +49,11 @@ def create_presenter_view(deck: Deck, slide_index: int = 0) -> Div:
                         cls="presenter-next-preview",
                     ),
                     cls="presenter-next-panel",
+                ),
+                # Elapsed timer display
+                Div(
+                    data_text="Math.floor($elapsed / 60).toString().padStart(2, '0') + ':' + ($elapsed % 60).toString().padStart(2, '0')",
+                    cls="presenter-timer",
                 ),
                 # Notes section
                 Div(
