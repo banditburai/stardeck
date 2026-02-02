@@ -17,6 +17,7 @@ def create_presenter_view(deck: Deck, slide_index: int = 0) -> Div:
         StarHTML component for presenter view.
     """
     current_slide = deck.slides[slide_index]
+    next_slide = deck.slides[slide_index + 1] if slide_index + 1 < deck.total else None
 
     return Div(
         # Main layout - two panels
@@ -29,6 +30,16 @@ def create_presenter_view(deck: Deck, slide_index: int = 0) -> Div:
             ),
             # Info panel (notes, timer, next preview)
             Div(
+                # Next slide preview
+                Div(
+                    H3("Next"),
+                    Div(
+                        render_slide(next_slide, deck) if next_slide else "End of presentation",
+                        id="presenter-next",
+                        cls="presenter-next-preview",
+                    ),
+                    cls="presenter-next-panel",
+                ),
                 # Notes section
                 Div(
                     H3("Notes"),

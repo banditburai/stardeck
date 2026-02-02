@@ -37,3 +37,10 @@ def test_presenter_has_notes_panel(client: TestClient):
     response = client.get("/presenter")
     html = response.text
     assert "notes" in html.lower()
+
+
+def test_presenter_has_next_slide_preview(client: TestClient):
+    """Test that presenter view has a next slide preview."""
+    response = client.get("/presenter")
+    html = response.text
+    assert "presenter-next" in html or "next-slide" in html
