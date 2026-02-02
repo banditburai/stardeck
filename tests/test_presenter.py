@@ -23,3 +23,17 @@ def test_presenter_route_exists(client: TestClient):
     response = client.get("/presenter")
     assert response.status_code == 200
     assert "presenter" in response.text.lower()
+
+
+def test_presenter_has_current_slide(client: TestClient):
+    """Test that presenter view has a current slide panel."""
+    response = client.get("/presenter")
+    html = response.text
+    assert "current-slide" in html or "presenter-current" in html
+
+
+def test_presenter_has_notes_panel(client: TestClient):
+    """Test that presenter view has a notes panel."""
+    response = client.get("/presenter")
+    html = response.text
+    assert "notes" in html.lower()
