@@ -161,3 +161,21 @@ def test_drawing_state_multiple_slides():
     assert len(state.elements[1]) == 1
     assert state.elements[0][0].id == "el-1"
     assert state.elements[1][0].id == "el-2"
+
+
+def test_pen_element_to_svg_path():
+    """PenElement should convert to SVG path string."""
+    from stardeck.drawing import PenElement, Point, element_to_svg
+
+    element = PenElement(
+        id="pen-1",
+        type="pen",
+        stroke_color="#ff0000",
+        stroke_width=2,
+        points=[Point(10, 20), Point(30, 40), Point(50, 30)],
+        slide_index=0,
+    )
+    svg = element_to_svg(element)
+    assert "path" in svg
+    assert 'stroke="#ff0000"' in svg
+    assert "M 10" in svg  # Move to start point
