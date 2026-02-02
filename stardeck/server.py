@@ -16,7 +16,6 @@ from starhtml import (
     sse,
     star_app,
 )
-from starhtml.datastar import evt
 from starlette.responses import JSONResponse
 
 from stardeck.parser import parse_deck
