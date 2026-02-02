@@ -404,10 +404,15 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default", 
                             action = state.get("action", "add")
                             if action == "add":
                                 event_data = json.dumps({"action": "add", "element": state["element"]})
-                            else:  # remove
+                            elif action == "remove":
                                 event_data = json.dumps({
                                     "action": "remove",
                                     "element_id": state["element_id"],
+                                    "slide_index": state["slide_index"],
+                                })
+                            else:  # clear
+                                event_data = json.dumps({
+                                    "action": "clear",
                                     "slide_index": state["slide_index"],
                                 })
                             yield f"event: datastar-drawing\ndata: {event_data}\n\n"
@@ -526,6 +531,32 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default", 
             await pres.broadcast_drawing(element)
             return JSONResponse({"redone": True, "element_id": element.id})
         return JSONResponse({"redone": False})
+
+    @rt("/api/presenter/draw/clear", methods=["POST"])
+    async def presenter_draw_clear(token: str, slide_index: int = 0):
+        """Clear all drawings on a slide and broadcast to audience."""
+        if token != deck_state["presenter_token"]:
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+
+        pres = deck_state["presentation"]
+        # Use current slide if not specified
+        if slide_index == 0:
+            slide_index = pres.slide_index
+        removed = pres.drawing.clear_slide(slide_index)
+        if removed:
+            # Broadcast clear to audience
+            async with pres._lock:
+                for queue in pres.subscribers:
+                    try:
+                        queue.put_nowait({
+                            "type": "drawing",
+                            "action": "clear",
+                            "slide_index": slide_index,
+                        })
+                    except asyncio.QueueFull:
+                        pass
+            return JSONResponse({"cleared": True, "count": len(removed)})
+        return JSONResponse({"cleared": False, "count": 0})
 
     # =========================================================================
     # Local navigation endpoints - For individual client navigation

@@ -130,6 +130,25 @@ class DrawingState:
             self.elements[slide_index].append(element)
         return action
 
+    def clear_slide(self, slide_index: int) -> list[DrawingElement]:
+        """Clear all elements from a specific slide.
+
+        Args:
+            slide_index: The slide to clear.
+
+        Returns:
+            List of removed elements (for potential undo support).
+        """
+        if slide_index not in self.elements:
+            return []
+        removed = self.elements[slide_index].copy()
+        self.elements[slide_index] = []
+        # Track for undo (as a single action)
+        if removed:
+            self.undo_stack.append({"type": "clear", "slide_index": slide_index, "elements": removed})
+            self.redo_stack.clear()
+        return removed
+
 
 def _points_to_path(points: list[Point]) -> str:
     """Convert a list of points to an SVG path string with smooth curves.
