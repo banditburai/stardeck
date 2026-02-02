@@ -65,9 +65,9 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default", 
             (total_slides := Signal("total_slides", deck.total)),
             (clicks := Signal("clicks", 0)),
             (max_clicks := Signal("max_clicks", initial_slide.max_clicks)),
-            # URL hash navigation on load - uses Datastar's data-on:load
+            # URL hash navigation on load - uses Datastar's data-init
             Span(
-                data_on_load="""
+                data_init="""
                     const hash = window.location.hash;
                     if (hash && hash.length > 1) {
                         const slideNum = parseInt(hash.substring(1), 10);
