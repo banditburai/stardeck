@@ -165,7 +165,8 @@ def transform_click_tags(content: str) -> tuple[str, int]:
     # Replace in reverse to preserve indices
     for i, match in enumerate(reversed(matches), 1):
         click_num = max_clicks - i + 1
-        replacement = f'<div class="click-reveal" data-click="{click_num}">{match.group(1)}</div>'
+        # data-show uses Datastar signal syntax to control visibility
+        replacement = f'<div class="click-reveal" data-click="{click_num}" data-show="$clicks >= {click_num}">{match.group(1)}</div>'
         result = result[: match.start()] + replacement + result[match.end() :]
 
     return result, max_clicks

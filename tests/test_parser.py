@@ -239,6 +239,9 @@ def test_transform_click_tags():
     assert 'data-click="1"' in result
     assert 'data-click="2"' in result
     assert 'class="click-reveal"' in result
+    # Verify data-show attributes for Datastar visibility control
+    assert 'data-show="$clicks >= 1"' in result
+    assert 'data-show="$clicks >= 2"' in result
 
 
 def test_transform_click_tags_preserves_content():
