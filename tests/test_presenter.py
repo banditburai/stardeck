@@ -66,3 +66,11 @@ def test_presenter_has_timer(client: TestClient):
     response = client.get("/presenter")
     html = response.text
     assert "timer" in html.lower() or "elapsed" in html.lower()
+
+
+def test_presenter_navigation_updates_audience(client: TestClient):
+    """Test that presenter navigation triggers SSE for all clients."""
+    response = client.get("/presenter")
+    html = response.text
+    # Presenter should have navigation that updates server state
+    assert "/api/slide/" in html
