@@ -195,6 +195,29 @@ def test_pen_element_to_svg_path():
     assert "M 10" in svg  # Move to start point
 
 
+def test_line_element_to_svg():
+    """LineElement should convert to SVG line element."""
+    from stardeck.drawing import LineElement, Point, element_to_svg
+
+    element = LineElement(
+        id="line-1",
+        type="line",
+        stroke_color="#0000ff",
+        stroke_width=2,
+        points=[Point(10, 10), Point(90, 90)],
+        start_arrow=False,
+        end_arrow=False,
+        slide_index=0,
+    )
+    svg = element_to_svg(element)
+    assert "<line" in svg
+    assert 'x1="10"' in svg
+    assert 'y1="10"' in svg
+    assert 'x2="90"' in svg
+    assert 'y2="90"' in svg
+    assert 'stroke="#0000ff"' in svg
+
+
 def test_presentation_state_has_drawing(tmp_path: Path):
     """PresentationState should include DrawingState for annotations."""
     from stardeck.server import create_app
