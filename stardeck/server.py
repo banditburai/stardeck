@@ -22,7 +22,7 @@ from starhtml import (
 from fastcore.xml import to_xml
 from starlette.responses import JSONResponse, StreamingResponse
 
-from stardeck.drawing import DrawingElement, DrawingState
+from stardeck.drawing import DrawingElement, DrawingState, parse_element
 from stardeck.parser import parse_deck
 from stardeck.presenter import create_presenter_view
 from stardeck.renderer import render_slide
@@ -455,6 +455,20 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default", 
         # Return updates for presenter view only (audience gets updates via /api/events)
         for update in yield_presenter_updates(pres.deck, pres.slide_index, pres.clicks):
             yield update
+
+    @rt("/api/presenter/draw", methods=["POST"])
+    async def presenter_draw(token: str, request):
+        """Add drawing element and broadcast to audience."""
+        if token != deck_state["presenter_token"]:
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+
+        body = await request.json()
+        pres = deck_state["presentation"]
+        drawing_element = parse_element(body)
+        await pres.add_drawing(drawing_element)
+
+        # Return confirmation (audience gets update via /api/events)
+        return JSONResponse({"drawing_added": True})
 
     # =========================================================================
     # Local navigation endpoints - For individual client navigation

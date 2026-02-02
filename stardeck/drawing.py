@@ -187,3 +187,74 @@ def element_to_svg(element: DrawingElement) -> str:
         )
 
     return ""
+
+
+def parse_element(data: dict) -> DrawingElement:
+    """Parse a dictionary into a DrawingElement.
+
+    Args:
+        data: Dictionary with element properties
+
+    Returns:
+        Appropriate DrawingElement subclass instance
+    """
+    element_type = data.get("type", "")
+
+    # Convert points list if present
+    points = []
+    if "points" in data:
+        points = [
+            Point(x=p.get("x", 0), y=p.get("y", 0), pressure=p.get("pressure", 1.0))
+            for p in data["points"]
+        ]
+
+    if element_type == "pen":
+        return PenElement(
+            id=data["id"],
+            type=element_type,
+            stroke_color=data["stroke_color"],
+            stroke_width=data["stroke_width"],
+            points=points,
+            slide_index=data["slide_index"],
+        )
+
+    if element_type in ("line", "arrow"):
+        return LineElement(
+            id=data["id"],
+            type=element_type,
+            stroke_color=data["stroke_color"],
+            stroke_width=data["stroke_width"],
+            points=points,
+            start_arrow=data.get("start_arrow", False),
+            end_arrow=data.get("end_arrow", element_type == "arrow"),
+            slide_index=data["slide_index"],
+        )
+
+    if element_type in ("rect", "ellipse", "diamond"):
+        return ShapeElement(
+            id=data["id"],
+            type=element_type,
+            x=data["x"],
+            y=data["y"],
+            width=data["width"],
+            height=data["height"],
+            stroke_color=data["stroke_color"],
+            stroke_width=data["stroke_width"],
+            fill_color=data.get("fill_color"),
+            slide_index=data["slide_index"],
+        )
+
+    if element_type == "text":
+        return TextElement(
+            id=data["id"],
+            type=element_type,
+            x=data["x"],
+            y=data["y"],
+            text=data["text"],
+            font_size=data["font_size"],
+            font_family=data["font_family"],
+            stroke_color=data["stroke_color"],
+            slide_index=data["slide_index"],
+        )
+
+    raise ValueError(f"Unknown element type: {element_type}")

@@ -6,15 +6,29 @@ from starlette.testclient import TestClient
 
 
 @pytest.fixture
-def client(tmp_path: Path):
-    """Create a test client with a simple deck."""
+def app_with_state(tmp_path: Path):
+    """Create an app with deck state."""
     from stardeck.server import create_app
 
     md_file = tmp_path / "slides.md"
     md_file.write_text("# Slide 1\n---\n# Slide 2")
 
     app, rt, deck_state = create_app(md_file)
+    return app, deck_state
+
+
+@pytest.fixture
+def client(app_with_state):
+    """Create a test client."""
+    app, _ = app_with_state
     return TestClient(app)
+
+
+@pytest.fixture
+def presenter_token(app_with_state):
+    """Get the presenter token for authentication."""
+    _, deck_state = app_with_state
+    return deck_state["presenter_token"]
 
 
 def test_drawing_layer_in_slide_viewport(client):
@@ -194,3 +208,20 @@ def test_presentation_state_has_drawing(tmp_path: Path):
 
     assert hasattr(pres, "drawing")
     assert isinstance(pres.drawing, DrawingState)
+
+
+def test_presenter_draw_endpoint(client: TestClient, presenter_token: str):
+    """Presenter should be able to add drawing elements via POST."""
+    element_data = {
+        "id": "el-1",
+        "type": "pen",
+        "stroke_color": "#ff0000",
+        "stroke_width": 2,
+        "points": [{"x": 10, "y": 20}],
+        "slide_index": 0,
+    }
+    response = client.post(
+        f"/api/presenter/draw?token={presenter_token}",
+        json=element_data
+    )
+    assert response.status_code == 200
