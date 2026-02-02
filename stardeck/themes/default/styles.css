@@ -375,17 +375,5 @@
     color: white;
 }
 
-/* Click reveals - hidden by default */
-.click-reveal {
-    opacity: 0;
-    transform: translateY(10px);
-    transition: opacity 0.3s ease-out, transform 0.3s ease-out;
-    pointer-events: none;
-}
-
-/* Revealed state - controlled by Datastar data-show */
-.click-reveal[data-show="true"] {
-    opacity: 1;
-    transform: translateY(0);
-    pointer-events: auto;
-}
+/* Click reveals - visibility controlled by Datastar data-show */
+/* No special CSS needed - Datastar handles display toggle directly */
