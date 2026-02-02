@@ -218,6 +218,57 @@ def test_line_element_to_svg():
     assert 'stroke="#0000ff"' in svg
 
 
+def test_rect_element_to_svg():
+    """ShapeElement with type rect should convert to SVG rect element."""
+    from stardeck.drawing import ShapeElement, element_to_svg
+
+    element = ShapeElement(
+        id="rect-1",
+        type="rect",
+        x=10,
+        y=10,
+        width=50,
+        height=30,
+        stroke_color="#00ff00",
+        stroke_width=2,
+        fill_color=None,
+        slide_index=0,
+    )
+    svg = element_to_svg(element)
+    assert "<rect" in svg
+    assert 'x="10"' in svg
+    assert 'y="10"' in svg
+    assert 'width="50"' in svg
+    assert 'height="30"' in svg
+    assert 'stroke="#00ff00"' in svg
+    assert 'fill="none"' in svg
+
+
+def test_ellipse_element_to_svg():
+    """ShapeElement with type ellipse should convert to SVG ellipse element."""
+    from stardeck.drawing import ShapeElement, element_to_svg
+
+    element = ShapeElement(
+        id="ellipse-1",
+        type="ellipse",
+        x=50,
+        y=50,
+        width=40,
+        height=20,
+        stroke_color="#ff00ff",
+        stroke_width=2,
+        fill_color=None,
+        slide_index=0,
+    )
+    svg = element_to_svg(element)
+    assert "<ellipse" in svg
+    assert 'cx="70.0"' in svg  # x + width/2
+    assert 'cy="60.0"' in svg  # y + height/2
+    assert 'rx="20.0"' in svg  # width/2
+    assert 'ry="10.0"' in svg  # height/2
+    assert 'stroke="#ff00ff"' in svg
+
+
 def test_presentation_state_has_drawing(tmp_path: Path):
     """PresentationState should include DrawingState for annotations."""
     from stardeck.server import create_app
