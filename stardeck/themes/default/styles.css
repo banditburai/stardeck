@@ -375,5 +375,16 @@
     color: white;
 }
 
-/* Click reveals - visibility controlled by Datastar data-show */
-/* No special CSS needed - Datastar handles display toggle directly */
+/* Click reveals - animated via CSS transitions */
+.click-reveal {
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+    pointer-events: none;
+}
+
+.click-reveal.revealed {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}

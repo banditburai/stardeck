@@ -149,7 +149,7 @@ def count_click_tags(content: str) -> int:
 
 
 def transform_click_tags(content: str) -> tuple[str, int]:
-    """Transform <click>...</click> to data-show divs.
+    """Transform <click>...</click> to click-reveal divs with CSS class toggling.
 
     Returns (transformed_content, max_clicks).
     """
@@ -165,8 +165,8 @@ def transform_click_tags(content: str) -> tuple[str, int]:
     # Replace in reverse to preserve indices
     for i, match in enumerate(reversed(matches), 1):
         click_num = max_clicks - i + 1
-        # data-show controls visibility based on clicks signal
-        replacement = f'<div class="click-reveal" data-click="{click_num}" data-show="$clicks >= {click_num}">{match.group(1)}</div>'
+        # data-class:revealed toggles "revealed" class for CSS transitions
+        replacement = f'<div class="click-reveal" data-click="{click_num}" data-class:revealed="$clicks >= {click_num}">{match.group(1)}</div>'
         result = result[: match.start()] + replacement + result[match.end() :]
 
     return result, max_clicks
