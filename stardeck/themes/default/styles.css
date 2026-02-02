@@ -388,3 +388,136 @@
     transform: translateY(0);
     pointer-events: auto;
 }
+
+/* Presenter Mode */
+.presenter-root {
+    --accent: #4ec5d4;
+    --accent-hover: #5ed3e1;
+    --bg-dark: #121212;
+    --bg-slide: #1e1e1e;
+    --text-primary: #e4e4e7;
+    --text-secondary: #a1a1aa;
+    --text-heading: #fafafa;
+    --border-color: rgba(255, 255, 255, 0.1);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    width: 100vw;
+    height: 100vh;
+    background: var(--bg-dark);
+    color: var(--text-primary);
+    overflow: hidden;
+}
+
+.presenter-layout {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1rem;
+    height: 100%;
+    padding: 1rem;
+}
+
+.presenter-slide-panel {
+    background: var(--bg-slide);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.presenter-slide-panel .slide {
+    transform: scale(0.8);
+    transform-origin: center;
+}
+
+.presenter-info-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.presenter-next-panel h3 {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+}
+
+.presenter-next-preview {
+    background: var(--bg-slide);
+    border-radius: 8px;
+    aspect-ratio: 16/9;
+    overflow: hidden;
+}
+
+.presenter-next-preview .slide {
+    transform: scale(0.4);
+    transform-origin: top left;
+}
+
+.presenter-notes-panel {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-y: auto;
+}
+
+.presenter-notes-panel h3 {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+}
+
+.presenter-notes-text {
+    font-size: 1rem;
+    line-height: 1.6;
+    color: var(--text-primary);
+}
+
+.presenter-timer {
+    font-size: 2rem;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    padding: 0.5rem;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+.presenter-nav-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 0.75rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+}
+
+.presenter-nav-btn {
+    padding: 0.5rem 1rem;
+    background: var(--accent);
+    color: var(--bg-dark);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.15s;
+}
+
+.presenter-nav-btn:hover:not(:disabled) {
+    background: var(--accent-hover);
+}
+
+.presenter-nav-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.presenter-slide-counter {
+    font-variant-numeric: tabular-nums;
+    font-size: 1rem;
+    color: var(--text-secondary);
+}
