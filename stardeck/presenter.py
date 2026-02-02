@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from starhtml import Button, Div, H3, Signal, Span, get
+from starhtml import Button, Div, H3, Signal, Span, get, post
 
 from stardeck.models import Deck
 from stardeck.renderer import render_slide
@@ -13,13 +13,92 @@ if TYPE_CHECKING:
     from stardeck.server import PresentationState
 
 
-def create_presenter_view(deck: Deck, pres: PresentationState | None = None) -> Div:
+def create_drawing_toolbar(token: str) -> Div:
+    """Create drawing toolbar with tool and action buttons.
+
+    Args:
+        token: Presenter authentication token.
+
+    Returns:
+        StarHTML Div component for the toolbar.
+    """
+    return Div(
+        # Tool buttons
+        Div(
+            Button(
+                "✏️",
+                data_on_click="$drawing_tool = 'pen'",
+                cls="tool-btn",
+                data_class_active="$drawing_tool === 'pen'",
+                title="Pen tool",
+            ),
+            Button(
+                "📏",
+                data_on_click="$drawing_tool = 'line'",
+                cls="tool-btn",
+                data_class_active="$drawing_tool === 'line'",
+                title="Line tool",
+            ),
+            Button(
+                "⬜",
+                data_on_click="$drawing_tool = 'rect'",
+                cls="tool-btn",
+                data_class_active="$drawing_tool === 'rect'",
+                title="Rectangle tool",
+            ),
+            Button(
+                "⭕",
+                data_on_click="$drawing_tool = 'ellipse'",
+                cls="tool-btn",
+                data_class_active="$drawing_tool === 'ellipse'",
+                title="Ellipse tool",
+            ),
+            Button(
+                "➡️",
+                data_on_click="$drawing_tool = 'arrow'",
+                cls="tool-btn",
+                data_class_active="$drawing_tool === 'arrow'",
+                title="Arrow tool",
+            ),
+            cls="toolbar-tools",
+        ),
+        # Actions
+        Div(
+            Button(
+                "↩️",
+                data_on_click=post(f"/api/presenter/draw/undo?token={token}"),
+                cls="tool-btn",
+                title="Undo",
+            ),
+            Button(
+                "↪️",
+                data_on_click=post(f"/api/presenter/draw/redo?token={token}"),
+                cls="tool-btn",
+                title="Redo",
+            ),
+            Button(
+                "🗑️",
+                data_on_click=post(f"/api/presenter/draw/clear?token={token}"),
+                cls="tool-btn",
+                title="Clear slide drawings",
+            ),
+            cls="toolbar-actions",
+        ),
+        cls="drawing-toolbar",
+        id="drawing-toolbar",
+    )
+
+
+def create_presenter_view(
+    deck: Deck, pres: PresentationState | None = None, *, token: str = ""
+) -> Div:
     """Create presenter view with current slide and controls.
 
     Args:
         deck: The slide deck.
         pres: Presentation state for broadcast sync. If provided, initializes
               from current state and uses broadcast endpoints.
+        token: Presenter authentication token for drawing endpoints.
 
     Returns:
         StarHTML component for presenter view.
@@ -43,6 +122,8 @@ def create_presenter_view(deck: Deck, pres: PresentationState | None = None) -> 
         (max_clicks := Signal("max_clicks", current_slide.max_clicks)),
         # Elapsed timer signal
         (elapsed := Signal("elapsed", 0)),
+        # Drawing tool signal
+        Signal("drawing_tool", "pen"),
         # Timer increment (every second) - hidden element
         Span(
             data_on_interval=(
@@ -127,5 +208,7 @@ def create_presenter_view(deck: Deck, pres: PresentationState | None = None) -> 
             ),
             cls="presenter-layout",
         ),
+        # Drawing toolbar (only shown when token is available)
+        create_drawing_toolbar(token) if token else None,
         cls="presenter-root",
     )

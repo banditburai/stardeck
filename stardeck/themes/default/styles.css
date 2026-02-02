@@ -575,3 +575,53 @@
     pointer-events: auto;
     cursor: crosshair;
 }
+
+/* Drawing Toolbar */
+.drawing-toolbar {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-dark);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 8px;
+    display: flex;
+    gap: 16px;
+    z-index: 200;
+}
+
+.toolbar-tools,
+.toolbar-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.tool-btn {
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-light);
+    cursor: pointer;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.tool-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent-color);
+}
+
+.tool-btn:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+}
+
+.tool-btn.active {
+    background: var(--accent-color);
+    border-color: var(--accent-color);
+}

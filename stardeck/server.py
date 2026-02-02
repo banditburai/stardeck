@@ -368,7 +368,9 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default", 
                 ),
                 style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #121212; font-family: system-ui;",
             )
-        return create_presenter_view(deck_state["deck"], deck_state["presentation"])
+        return create_presenter_view(
+            deck_state["deck"], deck_state["presentation"], token=token
+        )
 
     # =========================================================================
     # Broadcast sync endpoints - True presenter→audience sync
