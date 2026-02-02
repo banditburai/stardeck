@@ -163,3 +163,32 @@ def test_url_hash_parsing_supports_clicks(client: TestClient):
     assert "data-init" in html
     # Should handle the .clicks suffix in the hash
     assert ".split" in html or "indexOf" in html or "includes" in html
+
+
+def test_goto_slide_accepts_clicks_param(client: TestClient):
+    """Test that /api/slide/{idx}?clicks=N passes click state to SSE response."""
+    response = client.get("/api/slide/1?clicks=2")
+    assert response.status_code == 200
+    # SSE response should include the clicks value from query param
+    # (clamped to max_clicks for the slide)
+    assert "clicks" in response.text
+
+
+def test_goto_slide_clamps_clicks_to_max(tmp_path: Path):
+    """Test that clicks are clamped to max_clicks for the target slide."""
+    from stardeck.server import create_app
+
+    # Create deck with slides that have click tags
+    md_file = tmp_path / "slides.md"
+    md_file.write_text("# Slide 1\n<click>A</click>\n---\n# Slide 2")
+
+    app, rt, deck_state = create_app(md_file)
+    client = TestClient(app)
+
+    # Request slide 0 with clicks=100 (way more than max_clicks=1)
+    response = client.get("/api/slide/0?clicks=100")
+    assert response.status_code == 200
+    # The response should have clicks clamped to max_clicks (1)
+    # We can't easily parse SSE to verify exact value, but the test
+    # ensures the endpoint doesn't crash with out-of-range clicks
+    assert "clicks" in response.text

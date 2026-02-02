@@ -74,8 +74,7 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default", 
                         const slideNum = parseInt(parts[0], 10);
                         const clickNum = parts.length > 1 ? parseInt(parts[1], 10) : 0;
                         if (!isNaN(slideNum) && slideNum >= 1 && slideNum <= $total_slides) {
-                            $clicks = clickNum;
-                            @get('/api/slide/' + (slideNum - 1))
+                            @get('/api/slide/' + (slideNum - 1) + '?clicks=' + clickNum)
                         }
                     }
                 """,
@@ -92,8 +91,7 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default", 
                         const slideNum = parseInt(parts[0], 10);
                         const clickNum = parts.length > 1 ? parseInt(parts[1], 10) : 0;
                         if (!isNaN(slideNum) && slideNum >= 1 && slideNum <= $total_slides) {
-                            $clicks = clickNum;
-                            @get('/api/slide/' + (slideNum - 1))
+                            @get('/api/slide/' + (slideNum - 1) + '?clicks=' + clickNum)
                         }
                     }
                     """,
@@ -199,11 +197,13 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default", 
 
     @rt("/api/slide/{idx}")
     @sse
-    def goto_slide(idx: int):
+    def goto_slide(idx: int, clicks: int = 0):
         current_deck = deck_state["deck"]
         idx = max(0, min(idx, current_deck.total - 1))
         new_slide = current_deck.slides[idx]
-        yield signals(slide_index=idx, clicks=0, max_clicks=new_slide.max_clicks)
+        # Clamp clicks to valid range for this slide
+        clicks = max(0, min(clicks, new_slide.max_clicks))
+        yield signals(slide_index=idx, clicks=clicks, max_clicks=new_slide.max_clicks)
         yield elements(render_slide(new_slide, current_deck), "#slide-content", "inner")
 
     @rt("/api/reload")
