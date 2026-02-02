@@ -143,6 +143,11 @@ def parse_frontmatter(raw: str) -> tuple[dict, str]:
     return frontmatter, remaining
 
 
+def count_click_tags(content: str) -> int:
+    """Count the number of <click> tags in content."""
+    return len(re.findall(r"<click[^>]*>", content, re.IGNORECASE))
+
+
 def extract_notes(content: str) -> tuple[str, str]:
     """Extract speaker notes from HTML comments.
 
@@ -172,7 +177,7 @@ def _create_markdown_renderer() -> MarkdownIt:
     from pygments.lexers import get_lexer_by_name
     from pygments.lexers.special import TextLexer
 
-    md = MarkdownIt()
+    md = MarkdownIt().enable("table")
 
     # Override the fence renderer to use Pygments
     def render_fence(self, tokens, idx, options, env):

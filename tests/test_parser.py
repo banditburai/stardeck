@@ -1,6 +1,12 @@
 """Tests for stardeck parser."""
 
-from stardeck.parser import extract_notes, parse_deck, parse_frontmatter, split_slides
+from stardeck.parser import (
+    count_click_tags,
+    extract_notes,
+    parse_deck,
+    parse_frontmatter,
+    split_slides,
+)
 
 
 def test_split_slides_basic():
@@ -199,3 +205,25 @@ layout: cover
     # Other slides should have default layout
     assert deck.slides[0].layout == "default"
     assert deck.slides[2].layout == "default"
+
+
+def test_count_click_tags():
+    """count_click_tags should count <click> tags in content."""
+    content = """
+    <click>First</click>
+    <click>Second</click>
+    <click>Third</click>
+    """
+    assert count_click_tags(content) == 3
+
+
+def test_count_click_tags_empty():
+    """count_click_tags should return 0 when no click tags present."""
+    assert count_click_tags("No clicks here") == 0
+
+
+def test_count_click_tags_nested():
+    """count_click_tags should count each <click> tag, including nested."""
+    # Each <click> is one step, nesting counts each opening tag
+    content = "<click><click>Nested</click></click>"
+    assert count_click_tags(content) == 2
