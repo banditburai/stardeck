@@ -175,24 +175,27 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default", 
     def next_slide(slide_index: int = 0):
         current_deck = deck_state["deck"]
         new_idx = min(slide_index + 1, current_deck.total - 1)
-        yield signals(slide_index=new_idx)
-        yield elements(render_slide(current_deck.slides[new_idx], current_deck), "#slide-content", "inner")
+        new_slide = current_deck.slides[new_idx]
+        yield signals(slide_index=new_idx, clicks=0, max_clicks=new_slide.max_clicks)
+        yield elements(render_slide(new_slide, current_deck), "#slide-content", "inner")
 
     @rt("/api/slide/prev")
     @sse
     def prev_slide(slide_index: int = 0):
         current_deck = deck_state["deck"]
         new_idx = max(slide_index - 1, 0)
-        yield signals(slide_index=new_idx)
-        yield elements(render_slide(current_deck.slides[new_idx], current_deck), "#slide-content", "inner")
+        new_slide = current_deck.slides[new_idx]
+        yield signals(slide_index=new_idx, clicks=0, max_clicks=new_slide.max_clicks)
+        yield elements(render_slide(new_slide, current_deck), "#slide-content", "inner")
 
     @rt("/api/slide/{idx}")
     @sse
     def goto_slide(idx: int):
         current_deck = deck_state["deck"]
         idx = max(0, min(idx, current_deck.total - 1))
-        yield signals(slide_index=idx)
-        yield elements(render_slide(current_deck.slides[idx], current_deck), "#slide-content", "inner")
+        new_slide = current_deck.slides[idx]
+        yield signals(slide_index=idx, clicks=0, max_clicks=new_slide.max_clicks)
+        yield elements(render_slide(new_slide, current_deck), "#slide-content", "inner")
 
     @rt("/api/reload")
     @sse
@@ -201,8 +204,9 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default", 
         deck_state["deck"] = parse_deck(deck_state["path"])
         current_deck = deck_state["deck"]
         idx = min(slide_index, current_deck.total - 1)
-        yield signals(slide_index=idx, total_slides=current_deck.total)
-        yield elements(render_slide(current_deck.slides[idx], current_deck), "#slide-content", "inner")
+        new_slide = current_deck.slides[idx]
+        yield signals(slide_index=idx, total_slides=current_deck.total, clicks=0, max_clicks=new_slide.max_clicks)
+        yield elements(render_slide(new_slide, current_deck), "#slide-content", "inner")
 
     @rt("/api/watch-status")
     def watch_status():

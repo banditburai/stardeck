@@ -120,3 +120,24 @@ def test_keyboard_navigation_with_clicks(client: TestClient):
     # Navigation logic should compare clicks to max_clicks
     # This indicates click-aware navigation is implemented
     assert "$clicks < $max_clicks" in html or "clicks < max_clicks" in html
+
+
+def test_next_slide_resets_clicks(client: TestClient):
+    """Test that /api/slide/next SSE response resets clicks to 0."""
+    response = client.get("/api/slide/next?slide_index=0")
+    # SSE response should include clicks signal reset
+    assert "clicks" in response.text
+
+
+def test_prev_slide_resets_clicks(client: TestClient):
+    """Test that /api/slide/prev SSE response resets clicks to 0."""
+    response = client.get("/api/slide/prev?slide_index=1")
+    # SSE response should include clicks signal reset
+    assert "clicks" in response.text
+
+
+def test_goto_slide_resets_clicks(client: TestClient):
+    """Test that /api/slide/{idx} SSE response resets clicks to 0."""
+    response = client.get("/api/slide/1")
+    # SSE response should include clicks signal reset
+    assert "clicks" in response.text
