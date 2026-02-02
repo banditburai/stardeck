@@ -80,6 +80,20 @@ def create_drawing_toolbar(token: str) -> Div:
             ],
             cls="color-palette",
         ),
+        # Stroke width selector
+        Div(
+            *[
+                Button(
+                    "━" * i,
+                    data_on_click=f"$stroke_width = {i * 2}",
+                    cls="width-btn",
+                    data_class_active=f"$stroke_width === {i * 2}",
+                    title=f"{i * 2}px",
+                )
+                for i in [1, 2, 3, 4, 5]
+            ],
+            cls="width-selector",
+        ),
         # Actions
         Div(
             Button(
