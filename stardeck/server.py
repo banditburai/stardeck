@@ -59,9 +59,12 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default", 
 
     @rt("/")
     def home():
+        initial_slide = deck.slides[0]
         return Div(
             (slide_index := Signal("slide_index", 0)),
             (total_slides := Signal("total_slides", deck.total)),
+            (clicks := Signal("clicks", 0)),
+            (max_clicks := Signal("max_clicks", initial_slide.max_clicks)),
             # URL hash navigation on load - uses Datastar's data-on:load
             Span(
                 data_on_load="""
@@ -73,6 +76,22 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default", 
                         }
                     }
                 """,
+                style="display: none",
+            ),
+            # URL hash change listener - handles manual URL changes and back/forward
+            Span(
+                data_on_hashchange=(
+                    """
+                    const hash = window.location.hash;
+                    if (hash && hash.length > 1) {
+                        const slideNum = parseInt(hash.substring(1), 10);
+                        if (!isNaN(slideNum) && slideNum >= 1 && slideNum <= $total_slides) {
+                            @get('/api/slide/' + (slideNum - 1))
+                        }
+                    }
+                    """,
+                    {"window": True},
+                ),
                 style="display: none",
             ),
             # Slide viewport (full screen)

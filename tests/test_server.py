@@ -101,3 +101,13 @@ def test_watch_status_updates_on_file_change(tmp_path: Path):
     timestamp2 = response2.json()["timestamp"]
 
     assert timestamp2 > timestamp1
+
+
+def test_home_has_clicks_signal(client: TestClient):
+    """Test that home page has clicks signal for click animations."""
+    response = client.get("/")
+    html = response.text
+    # Verify clicks signal is present
+    assert "clicks" in html
+    # Verify data-signals attribute is present (StarHTML signal initialization)
+    assert "data-signals" in html
