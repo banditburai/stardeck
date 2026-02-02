@@ -114,3 +114,28 @@ def test_deck_get_slide():
     deck = Deck(slides=slides, config=DeckConfig(), filepath=Path("test.md"), raw="# One\n---\n# Two")
     assert deck.slides[0].raw == "# One"
     assert deck.slides[1].raw == "# Two"
+
+
+def test_slide_info_has_max_clicks():
+    """SlideInfo should accept and store max_clicks."""
+    slide = SlideInfo(
+        content="<p>Hello</p>",
+        raw="Hello",
+        index=0,
+        start_line=0,
+        end_line=1,
+        max_clicks=3,
+    )
+    assert slide.max_clicks == 3
+
+
+def test_slide_info_max_clicks_defaults_to_zero():
+    """SlideInfo max_clicks should default to 0."""
+    slide = SlideInfo(
+        content="<p>Hello</p>",
+        raw="Hello",
+        index=0,
+        start_line=0,
+        end_line=1,
+    )
+    assert slide.max_clicks == 0

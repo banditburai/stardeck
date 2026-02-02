@@ -16,6 +16,7 @@ class SlideInfo:
     frontmatter: dict = field(default_factory=dict)
     note: str = ""
     title: str = ""
+    max_clicks: int = 0
 
     @property
     def layout(self) -> str:
