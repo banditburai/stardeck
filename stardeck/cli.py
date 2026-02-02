@@ -30,8 +30,14 @@ def run(slides: Path, port: int, debug: bool, watch: bool):
 
     app, rt, deck_state = create_app(slides, debug=debug, watch=watch)
     deck = deck_state["deck"]
+    presenter_token = deck_state["presenter_token"]
+
     click.echo(f"Starting StarDeck on http://localhost:{port}")
     click.echo(f"Slides: {deck.total}")
+    click.echo("")
+    click.echo(f"  Audience:  http://localhost:{port}")
+    click.echo(f"  Presenter: http://localhost:{port}/presenter?token={presenter_token}")
+    click.echo("")
     if watch:
         click.echo("Watch mode enabled - file changes will trigger hot reload")
 

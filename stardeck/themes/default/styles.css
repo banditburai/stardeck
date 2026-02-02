@@ -422,13 +422,17 @@
     background: var(--bg-slide);
     border-radius: 8px;
     overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    position: relative;
 }
 
 .presenter-slide-panel .slide {
-    transform: scale(0.8);
+    /* Scale down the full-viewport slide to fit the panel */
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100vw;
+    height: 100vh;
+    transform: translate(-50%, -50%) scale(0.5);
     transform-origin: center;
 }
 
@@ -451,10 +455,18 @@
     border-radius: 8px;
     aspect-ratio: 16/9;
     overflow: hidden;
+    position: relative;
 }
 
 .presenter-next-preview .slide {
-    transform: scale(0.4);
+    /* Scale the full viewport slide to fit the small preview */
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1920px;
+    height: 1080px;
+    /* Scale to fit ~350px wide container (350/1920 ≈ 0.18) */
+    transform: scale(0.18);
     transform-origin: top left;
 }
 

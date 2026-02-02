@@ -1,29 +1,45 @@
 """Presenter mode view for StarDeck."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from starhtml import Button, Div, H3, Signal, Span, get
 
 from stardeck.models import Deck
 from stardeck.renderer import render_slide
 
+if TYPE_CHECKING:
+    from stardeck.server import PresentationState
 
-def create_presenter_view(deck: Deck, slide_index: int = 0) -> Div:
+
+def create_presenter_view(deck: Deck, pres: PresentationState | None = None) -> Div:
     """Create presenter view with current slide and controls.
 
     Args:
         deck: The slide deck.
-        slide_index: Current slide index.
+        pres: Presentation state for broadcast sync. If provided, initializes
+              from current state and uses broadcast endpoints.
 
     Returns:
         StarHTML component for presenter view.
     """
+    # Initialize from presentation state if available
+    slide_index = pres.slide_index if pres else 0
+    clicks_val = pres.clicks if pres else 0
+
     current_slide = deck.slides[slide_index]
     next_slide = deck.slides[slide_index + 1] if slide_index + 1 < deck.total else None
+
+    # Use broadcast endpoints when pres is available
+    next_endpoint = "/api/presenter/next" if pres else "/api/slide/next"
+    prev_endpoint = "/api/presenter/prev" if pres else "/api/slide/prev"
 
     return Div(
         # Signals for slide navigation state (enables multi-window sync)
         (slide_idx := Signal("slide_index", slide_index)),
         (total := Signal("total_slides", deck.total)),
-        (clicks := Signal("clicks", 0)),
+        (clicks := Signal("clicks", clicks_val)),
         (max_clicks := Signal("max_clicks", current_slide.max_clicks)),
         # Elapsed timer signal
         (elapsed := Signal("elapsed", 0)),
@@ -35,26 +51,17 @@ def create_presenter_view(deck: Deck, slide_index: int = 0) -> Div:
             ),
             style="display: none",
         ),
-        # Keyboard navigation with click support (window-level)
+        # Keyboard navigation - uses broadcast endpoints for presenter→audience sync
         Span(
             data_on_keydown=(
-                """
-                if (evt.key === 'ArrowRight' || evt.key === ' ') {
+                f"""
+                if (evt.key === 'ArrowRight' || evt.key === ' ') {{
                     evt.preventDefault();
-                    if ($clicks < $max_clicks) {
-                        $clicks++;
-                    } else {
-                        $clicks = 0;
-                        @get('/api/slide/next');
-                    }
-                } else if (evt.key === 'ArrowLeft') {
+                    @get('{next_endpoint}');
+                }} else if (evt.key === 'ArrowLeft') {{
                     evt.preventDefault();
-                    if ($clicks > 0) {
-                        $clicks--;
-                    } else {
-                        @get('/api/slide/prev');
-                    }
-                }
+                    @get('{prev_endpoint}');
+                }}
                 """,
                 {"window": True},
             ),
@@ -96,12 +103,12 @@ def create_presenter_view(deck: Deck, slide_index: int = 0) -> Div:
                     id="presenter-notes",
                     cls="presenter-notes-panel",
                 ),
-                # Navigation controls (triggers SSE for multi-window sync)
+                # Navigation controls - uses broadcast endpoints
                 Div(
                     Button(
                         "← Prev",
                         cls="presenter-nav-btn",
-                        data_on_click=get("/api/slide/prev"),
+                        data_on_click=get(prev_endpoint),
                         data_attr_disabled=slide_idx == 0,
                     ),
                     Span(
@@ -111,7 +118,7 @@ def create_presenter_view(deck: Deck, slide_index: int = 0) -> Div:
                     Button(
                         "Next →",
                         cls="presenter-nav-btn",
-                        data_on_click=get("/api/slide/next"),
+                        data_on_click=get(next_endpoint),
                         data_attr_disabled=slide_idx == total - 1,
                     ),
                     cls="presenter-nav-bar",
