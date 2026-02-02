@@ -39,6 +39,14 @@ def test_drawing_layer_in_slide_viewport(client):
     assert "<svg" in response.text
 
 
+def test_drawing_layer_has_arrow_marker(client):
+    """Drawing layer SVG should include arrow marker definition for arrows."""
+    response = client.get("/")
+    assert response.status_code == 200
+    assert '<marker id="arrow"' in response.text
+    assert "markerwidth" in response.text.lower()  # Attributes are lowercased
+
+
 def test_drawing_element_creation():
     """Point and PenElement should be creatable with required fields."""
     from stardeck.drawing import PenElement, Point
@@ -251,6 +259,51 @@ def test_drawing_state_clear_slide():
     assert len(state.elements.get(0, [])) == 0
     assert len(state.elements.get(1, [])) == 1  # Slide 1 unaffected
     assert state.elements[1][0].id == "el-3"
+
+
+def test_drawing_state_undo_clear():
+    """Undo of clear_slide should restore all cleared elements."""
+    from stardeck.drawing import DrawingState, PenElement, Point
+
+    state = DrawingState()
+    el1 = PenElement(
+        id="el-1", type="pen", stroke_color="#f00",
+        stroke_width=2, points=[Point(0, 0)], slide_index=0
+    )
+    el2 = PenElement(
+        id="el-2", type="pen", stroke_color="#0f0",
+        stroke_width=2, points=[Point(10, 10)], slide_index=0
+    )
+    state.add_element(el1)
+    state.add_element(el2)
+
+    # Clear the slide
+    state.clear_slide(0)
+    assert len(state.elements.get(0, [])) == 0
+
+    # Undo should restore both elements
+    state.undo()
+    assert len(state.elements[0]) == 2
+    assert state.elements[0][0].id == "el-1"
+    assert state.elements[0][1].id == "el-2"
+
+
+def test_drawing_state_redo_clear():
+    """Redo of undone clear should re-clear the slide."""
+    from stardeck.drawing import DrawingState, PenElement, Point
+
+    state = DrawingState()
+    el1 = PenElement(
+        id="el-1", type="pen", stroke_color="#f00",
+        stroke_width=2, points=[Point(0, 0)], slide_index=0
+    )
+    state.add_element(el1)
+    state.clear_slide(0)
+    state.undo()
+
+    # Redo should clear again
+    state.redo()
+    assert len(state.elements.get(0, [])) == 0
 
 
 def test_pen_element_to_svg_path():

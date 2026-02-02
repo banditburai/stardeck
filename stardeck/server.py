@@ -20,7 +20,7 @@ from starhtml import (
     sse,
     star_app,
 )
-from fastcore.xml import to_xml
+from fastcore.xml import ft, to_xml
 from starlette.responses import JSONResponse, StreamingResponse
 
 from stardeck.drawing import DrawingElement, DrawingState, element_to_dict, parse_element
@@ -273,6 +273,19 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default", 
                 render_slide(deck.slides[0], deck),
                 # Drawing layer overlay (SVG for vector annotations)
                 Svg(
+                    # Arrow marker definition for line arrows
+                    ft("defs",
+                        ft("marker",
+                            ft("path", d="M 0 0 L 10 5 L 0 10 z", fill="currentColor"),
+                            id="arrow",
+                            viewBox="0 0 10 10",
+                            refX="9",
+                            refY="5",
+                            markerWidth="6",
+                            markerHeight="6",
+                            orient="auto-start-reverse",
+                        ),
+                    ),
                     id="drawing-layer",
                     cls="drawing-layer",
                     viewBox="0 0 100 100",

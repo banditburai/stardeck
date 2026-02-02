@@ -113,6 +113,11 @@ class DrawingState:
         if action["type"] == "add":
             element = action["element"]
             self._remove_element(element.id, element.slide_index)
+        elif action["type"] == "clear":
+            slide_index = action["slide_index"]
+            if slide_index not in self.elements:
+                self.elements[slide_index] = []
+            self.elements[slide_index].extend(action["elements"])
         return action
 
     def redo(self) -> dict | None:
@@ -128,6 +133,10 @@ class DrawingState:
             if slide_index not in self.elements:
                 self.elements[slide_index] = []
             self.elements[slide_index].append(element)
+        elif action["type"] == "clear":
+            slide_index = action["slide_index"]
+            if slide_index in self.elements:
+                self.elements[slide_index] = []
         return action
 
     def clear_slide(self, slide_index: int) -> list[DrawingElement]:
