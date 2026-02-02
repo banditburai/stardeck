@@ -6,6 +6,7 @@ from stardeck.parser import (
     parse_deck,
     parse_frontmatter,
     split_slides,
+    transform_click_tags,
 )
 
 
@@ -227,3 +228,42 @@ def test_count_click_tags_nested():
     # Each <click> is one step, nesting counts each opening tag
     content = "<click><click>Nested</click></click>"
     assert count_click_tags(content) == 2
+
+
+def test_transform_click_tags():
+    """transform_click_tags should convert <click> tags to data-show divs."""
+    content = "<click>First</click><click>Second</click>"
+    result, max_clicks = transform_click_tags(content)
+
+    assert max_clicks == 2
+    assert 'data-click="1"' in result
+    assert 'data-click="2"' in result
+    assert 'class="click-reveal"' in result
+
+
+def test_transform_click_tags_preserves_content():
+    """transform_click_tags should preserve inner content."""
+    content = "<click><p>Hello</p></click>"
+    result, _ = transform_click_tags(content)
+
+    assert "<p>Hello</p>" in result
+
+
+def test_transform_click_tags_no_clicks():
+    """transform_click_tags should return unchanged content when no clicks."""
+    content = "No click tags here"
+    result, max_clicks = transform_click_tags(content)
+
+    assert result == content
+    assert max_clicks == 0
+
+
+def test_parse_deck_with_click_tags(tmp_path):
+    """parse_deck should transform click tags and set max_clicks."""
+    md_file = tmp_path / "slides.md"
+    md_file.write_text("# Slide\n<click>One</click>\n<click>Two</click>")
+    deck = parse_deck(md_file)
+
+    assert deck.slides[0].max_clicks == 2
+    assert 'data-click="1"' in deck.slides[0].content
+    assert 'data-click="2"' in deck.slides[0].content

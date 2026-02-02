@@ -148,6 +148,29 @@ def count_click_tags(content: str) -> int:
     return len(re.findall(r"<click[^>]*>", content, re.IGNORECASE))
 
 
+def transform_click_tags(content: str) -> tuple[str, int]:
+    """Transform <click>...</click> to data-show divs.
+
+    Returns (transformed_content, max_clicks).
+    """
+    pattern = r"<click>(.*?)</click>"
+    matches = list(re.finditer(pattern, content, re.DOTALL))
+
+    if not matches:
+        return content, 0
+
+    max_clicks = len(matches)
+    result = content
+
+    # Replace in reverse to preserve indices
+    for i, match in enumerate(reversed(matches), 1):
+        click_num = max_clicks - i + 1
+        replacement = f'<div class="click-reveal" data-click="{click_num}">{match.group(1)}</div>'
+        result = result[: match.start()] + replacement + result[match.end() :]
+
+    return result, max_clicks
+
+
 def extract_notes(content: str) -> tuple[str, str]:
     """Extract speaker notes from HTML comments.
 
@@ -218,6 +241,9 @@ def parse_deck(filepath: Path) -> Deck:
         # Extract notes
         content, note = extract_notes(content)
 
+        # Transform click tags before markdown rendering
+        content, max_clicks = transform_click_tags(content)
+
         # Render markdown to HTML
         html_content = md.render(content)
 
@@ -229,6 +255,7 @@ def parse_deck(filepath: Path) -> Deck:
             end_line=end_line,
             frontmatter=frontmatter,
             note=note,
+            max_clicks=max_clicks,
         )
         slides.append(slide)
 
