@@ -12,6 +12,7 @@ from starhtml import (
     Signal,
     Span,
     Style,
+    Svg,
     elements,
     get,
     signals,
@@ -249,6 +250,13 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default", 
             # Slide viewport (full screen)
             Div(
                 render_slide(deck.slides[0], deck),
+                # Drawing layer overlay (SVG for vector annotations)
+                Svg(
+                    id="drawing-layer",
+                    cls="drawing-layer",
+                    viewBox="0 0 100 100",
+                    preserveAspectRatio="none",
+                ),
                 id="slide-content",
                 cls="slide-viewport",
             ),

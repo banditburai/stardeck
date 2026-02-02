@@ -1,5 +1,29 @@
 """Tests for stardeck drawing data models."""
 
+import pytest
+from pathlib import Path
+from starlette.testclient import TestClient
+
+
+@pytest.fixture
+def client(tmp_path: Path):
+    """Create a test client with a simple deck."""
+    from stardeck.server import create_app
+
+    md_file = tmp_path / "slides.md"
+    md_file.write_text("# Slide 1\n---\n# Slide 2")
+
+    app, rt, deck_state = create_app(md_file)
+    return TestClient(app)
+
+
+def test_drawing_layer_in_slide_viewport(client):
+    """Drawing layer SVG should be present in the slide viewport."""
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "drawing-layer" in response.text
+    assert "<svg" in response.text
+
 
 def test_drawing_element_creation():
     """Point and PenElement should be creatable with required fields."""
