@@ -44,3 +44,18 @@ def test_presenter_has_next_slide_preview(client: TestClient):
     response = client.get("/presenter")
     html = response.text
     assert "presenter-next" in html or "next-slide" in html
+
+
+def test_presenter_shows_speaker_notes(tmp_path: Path):
+    """Test that presenter view displays speaker notes from slide."""
+    from stardeck.server import create_app
+
+    md_file = tmp_path / "slides.md"
+    md_file.write_text("# Slide 1\n\n<!-- notes\nThese are my speaker notes.\n-->")
+
+    app, rt, deck_state = create_app(md_file)
+    client = TestClient(app)
+
+    response = client.get("/presenter")
+    # Verify the actual note content appears in the response
+    assert "These are my speaker notes" in response.text
