@@ -65,12 +65,16 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default", 
             (clicks := Signal("clicks", 0)),
             (max_clicks := Signal("max_clicks", initial_slide.max_clicks)),
             # URL hash navigation on load - uses Datastar's data-init
+            # Supports #slide or #slide.click format (e.g., #3 or #3.2)
             Span(
                 data_init="""
                     const hash = window.location.hash;
                     if (hash && hash.length > 1) {
-                        const slideNum = parseInt(hash.substring(1), 10);
+                        const parts = hash.substring(1).split('.');
+                        const slideNum = parseInt(parts[0], 10);
+                        const clickNum = parts.length > 1 ? parseInt(parts[1], 10) : 0;
                         if (!isNaN(slideNum) && slideNum >= 1 && slideNum <= $total_slides) {
+                            $clicks = clickNum;
                             @get('/api/slide/' + (slideNum - 1))
                         }
                     }
@@ -78,13 +82,17 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default", 
                 style="display: none",
             ),
             # URL hash change listener - handles manual URL changes and back/forward
+            # Supports #slide or #slide.click format (e.g., #3 or #3.2)
             Span(
                 data_on_hashchange=(
                     """
                     const hash = window.location.hash;
                     if (hash && hash.length > 1) {
-                        const slideNum = parseInt(hash.substring(1), 10);
+                        const parts = hash.substring(1).split('.');
+                        const slideNum = parseInt(parts[0], 10);
+                        const clickNum = parts.length > 1 ? parseInt(parts[1], 10) : 0;
                         if (!isNaN(slideNum) && slideNum >= 1 && slideNum <= $total_slides) {
+                            $clicks = clickNum;
                             @get('/api/slide/' + (slideNum - 1))
                         }
                     }
@@ -145,8 +153,9 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default", 
                 style="display: none",
             ),
             # URL hash update on navigation - uses Datastar effect (DS-005)
+            # Format: #slide or #slide.click (e.g., #3 or #3.2)
             Span(
-                data_effect="window.history.replaceState(null, '', '#' + ($slide_index + 1))",
+                data_effect="window.history.replaceState(null, '', '#' + ($slide_index + 1) + ($clicks > 0 ? '.' + $clicks : ''))",
                 style="display: none",
             ),
             # Watch mode polling for hot reload (only when watch=True)

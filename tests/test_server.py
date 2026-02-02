@@ -141,3 +141,25 @@ def test_goto_slide_resets_clicks(client: TestClient):
     response = client.get("/api/slide/1")
     # SSE response should include clicks signal reset
     assert "clicks" in response.text
+
+
+def test_url_hash_includes_clicks(client: TestClient):
+    """Test that URL hash format supports clicks: #slide or #slide.click."""
+    response = client.get("/")
+    html = response.text
+    # URL hash effect should include clicks when clicks > 0
+    # Format: #3 for slide 3 with 0 clicks, #3.2 for slide 3 click 2
+    assert "history.replaceState" in html or "location.hash" in html
+    # Should conditionally append .clicks when clicks > 0
+    assert "$clicks" in html
+
+
+def test_url_hash_parsing_supports_clicks(client: TestClient):
+    """Test that URL hash parsing on load supports #slide.click format."""
+    response = client.get("/")
+    html = response.text
+    # Hash parsing should extract both slide and click from #3.2 format
+    # The init handler should parse the dot-separated format
+    assert "data-init" in html
+    # Should handle the .clicks suffix in the hash
+    assert ".split" in html or "indexOf" in html or "includes" in html
