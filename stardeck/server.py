@@ -22,6 +22,7 @@ from starhtml import (
 from fastcore.xml import to_xml
 from starlette.responses import JSONResponse, StreamingResponse
 
+from stardeck.drawing import DrawingElement, DrawingState
 from stardeck.parser import parse_deck
 from stardeck.presenter import create_presenter_view
 from stardeck.renderer import render_slide
@@ -43,6 +44,7 @@ class PresentationState:
         self.clicks = 0
         self.subscribers: list[asyncio.Queue] = []
         self._lock = asyncio.Lock()
+        self.drawing = DrawingState()
 
     @property
     def current_slide(self):
@@ -120,6 +122,24 @@ class PresentationState:
         # Clamp current position to valid range
         self.slide_index = min(self.slide_index, new_deck.total - 1)
         self.clicks = min(self.clicks, self.current_slide.max_clicks)
+
+    async def add_drawing(self, element: DrawingElement):
+        """Add a drawing element and broadcast to all subscribers."""
+        self.drawing.add_element(element)
+        await self.broadcast_drawing(element)
+
+    async def broadcast_drawing(self, element: DrawingElement):
+        """Broadcast a drawing element to all subscribers."""
+        async with self._lock:
+            for queue in self.subscribers:
+                try:
+                    queue.put_nowait({
+                        "type": "drawing",
+                        "action": "add",
+                        "element": element,
+                    })
+                except asyncio.QueueFull:
+                    pass
 
 
 def yield_audience_updates(deck, slide_idx: int, clicks: int = 0):

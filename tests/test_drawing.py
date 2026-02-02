@@ -179,3 +179,18 @@ def test_pen_element_to_svg_path():
     assert "path" in svg
     assert 'stroke="#ff0000"' in svg
     assert "M 10" in svg  # Move to start point
+
+
+def test_presentation_state_has_drawing(tmp_path: Path):
+    """PresentationState should include DrawingState for annotations."""
+    from stardeck.server import create_app
+    from stardeck.drawing import DrawingState
+
+    md_file = tmp_path / "slides.md"
+    md_file.write_text("# Slide 1")
+
+    app, rt, deck_state = create_app(md_file)
+    pres = deck_state["presentation"]
+
+    assert hasattr(pres, "drawing")
+    assert isinstance(pres.drawing, DrawingState)
