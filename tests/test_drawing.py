@@ -177,6 +177,53 @@ def test_drawing_state_multiple_slides():
     assert state.elements[1][0].id == "el-2"
 
 
+def test_drawing_state_undo():
+    """DrawingState should support undo operation."""
+    from stardeck.drawing import DrawingState, PenElement, Point
+
+    state = DrawingState()
+    el1 = PenElement(
+        id="el-1", type="pen", stroke_color="#f00",
+        stroke_width=2, points=[Point(0, 0)], slide_index=0
+    )
+    el2 = PenElement(
+        id="el-2", type="pen", stroke_color="#0f0",
+        stroke_width=2, points=[Point(10, 10)], slide_index=0
+    )
+    state.add_element(el1)
+    state.add_element(el2)
+
+    # Undo should remove last element
+    state.undo()
+    assert len(state.elements[0]) == 1
+    assert state.elements[0][0].id == "el-1"
+    assert len(state.redo_stack) == 1
+
+
+def test_drawing_state_redo():
+    """DrawingState should support redo operation."""
+    from stardeck.drawing import DrawingState, PenElement, Point
+
+    state = DrawingState()
+    el1 = PenElement(
+        id="el-1", type="pen", stroke_color="#f00",
+        stroke_width=2, points=[Point(0, 0)], slide_index=0
+    )
+    el2 = PenElement(
+        id="el-2", type="pen", stroke_color="#0f0",
+        stroke_width=2, points=[Point(10, 10)], slide_index=0
+    )
+    state.add_element(el1)
+    state.add_element(el2)
+    state.undo()
+
+    # Redo should restore the element
+    state.redo()
+    assert len(state.elements[0]) == 2
+    assert state.elements[0][1].id == "el-2"
+    assert len(state.redo_stack) == 0
+
+
 def test_pen_element_to_svg_path():
     """PenElement should convert to SVG path string."""
     from stardeck.drawing import PenElement, Point, element_to_svg

@@ -401,8 +401,16 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default", 
 
                         # Handle drawing events
                         if state.get("type") == "drawing":
-                            element_json = json.dumps(state["element"])
-                            yield f"event: datastar-drawing\ndata: {element_json}\n\n"
+                            action = state.get("action", "add")
+                            if action == "add":
+                                event_data = json.dumps({"action": "add", "element": state["element"]})
+                            else:  # remove
+                                event_data = json.dumps({
+                                    "action": "remove",
+                                    "element_id": state["element_id"],
+                                    "slide_index": state["slide_index"],
+                                })
+                            yield f"event: datastar-drawing\ndata: {event_data}\n\n"
                             continue
 
                         # Send signal updates (Datastar format) for navigation events
@@ -478,6 +486,46 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default", 
 
         # Return confirmation (audience gets update via /api/events)
         return JSONResponse({"drawing_added": True})
+
+    @rt("/api/presenter/draw/undo", methods=["POST"])
+    async def presenter_draw_undo(token: str):
+        """Undo last drawing action and broadcast to audience."""
+        if token != deck_state["presenter_token"]:
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+
+        pres = deck_state["presentation"]
+        action = pres.drawing.undo()
+        if action:
+            # Broadcast removal to audience
+            element = action["element"]
+            async with pres._lock:
+                for queue in pres.subscribers:
+                    try:
+                        queue.put_nowait({
+                            "type": "drawing",
+                            "action": "remove",
+                            "element_id": element.id,
+                            "slide_index": element.slide_index,
+                        })
+                    except asyncio.QueueFull:
+                        pass
+            return JSONResponse({"undone": True, "element_id": element.id})
+        return JSONResponse({"undone": False})
+
+    @rt("/api/presenter/draw/redo", methods=["POST"])
+    async def presenter_draw_redo(token: str):
+        """Redo last undone drawing action and broadcast to audience."""
+        if token != deck_state["presenter_token"]:
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+
+        pres = deck_state["presentation"]
+        action = pres.drawing.redo()
+        if action:
+            # Broadcast addition to audience
+            element = action["element"]
+            await pres.broadcast_drawing(element)
+            return JSONResponse({"redone": True, "element_id": element.id})
+        return JSONResponse({"redone": False})
 
     # =========================================================================
     # Local navigation endpoints - For individual client navigation

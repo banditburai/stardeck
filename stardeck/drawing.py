@@ -93,6 +93,43 @@ class DrawingState:
         # Clear redo stack on new action
         self.redo_stack.clear()
 
+    def _remove_element(self, element_id: str, slide_index: int) -> bool:
+        """Remove an element by ID from a specific slide."""
+        if slide_index not in self.elements:
+            return False
+        for i, el in enumerate(self.elements[slide_index]):
+            if el.id == element_id:
+                self.elements[slide_index].pop(i)
+                return True
+        return False
+
+    def undo(self) -> dict | None:
+        """Undo the last action."""
+        if not self.undo_stack:
+            return None
+        action = self.undo_stack.pop()
+        self.redo_stack.append(action)
+        # Reverse the action
+        if action["type"] == "add":
+            element = action["element"]
+            self._remove_element(element.id, element.slide_index)
+        return action
+
+    def redo(self) -> dict | None:
+        """Redo the last undone action."""
+        if not self.redo_stack:
+            return None
+        action = self.redo_stack.pop()
+        self.undo_stack.append(action)
+        # Replay the action
+        if action["type"] == "add":
+            element = action["element"]
+            slide_index = element.slide_index
+            if slide_index not in self.elements:
+                self.elements[slide_index] = []
+            self.elements[slide_index].append(element)
+        return action
+
 
 def _points_to_path(points: list[Point]) -> str:
     """Convert a list of points to an SVG path string with smooth curves.
