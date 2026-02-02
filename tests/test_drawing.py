@@ -225,3 +225,27 @@ def test_presenter_draw_endpoint(client: TestClient, presenter_token: str):
         json=element_data
     )
     assert response.status_code == 200
+
+
+def test_drawing_element_to_dict():
+    """Drawing elements should be serializable to dict for SSE broadcast."""
+    from stardeck.drawing import PenElement, Point, element_to_dict
+
+    element = PenElement(
+        id="pen-1",
+        type="pen",
+        stroke_color="#ff0000",
+        stroke_width=2,
+        points=[Point(10, 20, 0.5), Point(30, 40)],
+        slide_index=0,
+    )
+    d = element_to_dict(element)
+
+    assert d["id"] == "pen-1"
+    assert d["type"] == "pen"
+    assert d["stroke_color"] == "#ff0000"
+    assert d["slide_index"] == 0
+    assert len(d["points"]) == 2
+    assert d["points"][0]["x"] == 10
+    assert d["points"][0]["pressure"] == 0.5
+    assert d["points"][1]["pressure"] == 1.0  # default

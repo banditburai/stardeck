@@ -189,6 +189,73 @@ def element_to_svg(element: DrawingElement) -> str:
     return ""
 
 
+def element_to_dict(element: DrawingElement) -> dict:
+    """Convert a DrawingElement to a JSON-serializable dictionary.
+
+    Args:
+        element: Any DrawingElement subclass instance
+
+    Returns:
+        Dictionary suitable for JSON serialization
+    """
+    if isinstance(element, PenElement):
+        return {
+            "id": element.id,
+            "type": element.type,
+            "stroke_color": element.stroke_color,
+            "stroke_width": element.stroke_width,
+            "points": [
+                {"x": p.x, "y": p.y, "pressure": p.pressure}
+                for p in element.points
+            ],
+            "slide_index": element.slide_index,
+        }
+
+    if isinstance(element, LineElement):
+        return {
+            "id": element.id,
+            "type": element.type,
+            "stroke_color": element.stroke_color,
+            "stroke_width": element.stroke_width,
+            "points": [
+                {"x": p.x, "y": p.y, "pressure": p.pressure}
+                for p in element.points
+            ],
+            "start_arrow": element.start_arrow,
+            "end_arrow": element.end_arrow,
+            "slide_index": element.slide_index,
+        }
+
+    if isinstance(element, ShapeElement):
+        return {
+            "id": element.id,
+            "type": element.type,
+            "x": element.x,
+            "y": element.y,
+            "width": element.width,
+            "height": element.height,
+            "stroke_color": element.stroke_color,
+            "stroke_width": element.stroke_width,
+            "fill_color": element.fill_color,
+            "slide_index": element.slide_index,
+        }
+
+    if isinstance(element, TextElement):
+        return {
+            "id": element.id,
+            "type": element.type,
+            "x": element.x,
+            "y": element.y,
+            "text": element.text,
+            "font_size": element.font_size,
+            "font_family": element.font_family,
+            "stroke_color": element.stroke_color,
+            "slide_index": element.slide_index,
+        }
+
+    raise ValueError(f"Unknown element type: {type(element)}")
+
+
 def parse_element(data: dict) -> DrawingElement:
     """Parse a dictionary into a DrawingElement.
 

@@ -1,6 +1,7 @@
 """StarDeck server application."""
 
 import asyncio
+import json
 import secrets
 import time
 from pathlib import Path
@@ -22,7 +23,7 @@ from starhtml import (
 from fastcore.xml import to_xml
 from starlette.responses import JSONResponse, StreamingResponse
 
-from stardeck.drawing import DrawingElement, DrawingState, parse_element
+from stardeck.drawing import DrawingElement, DrawingState, element_to_dict, parse_element
 from stardeck.parser import parse_deck
 from stardeck.presenter import create_presenter_view
 from stardeck.renderer import render_slide
@@ -136,7 +137,7 @@ class PresentationState:
                     queue.put_nowait({
                         "type": "drawing",
                         "action": "add",
-                        "element": element,
+                        "element": element_to_dict(element),
                     })
                 except asyncio.QueueFull:
                     pass
@@ -396,7 +397,13 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default", 
                         # Wait for next state change (with timeout to keep connection alive)
                         state = await asyncio.wait_for(queue.get(), timeout=30.0)
 
-                        # Send signal updates (Datastar format)
+                        # Handle drawing events
+                        if state.get("type") == "drawing":
+                            element_json = json.dumps(state["element"])
+                            yield f"event: datastar-drawing\ndata: {element_json}\n\n"
+                            continue
+
+                        # Send signal updates (Datastar format) for navigation events
                         yield f"event: datastar-patch-signals\ndata: signals {{\"slide_index\": {state['slide_index']}, \"clicks\": {state['clicks']}, \"max_clicks\": {state['max_clicks']}}}\n\n"
 
                         # Send element updates for audience view
