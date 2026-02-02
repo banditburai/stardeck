@@ -35,6 +35,31 @@ def create_presenter_view(deck: Deck, slide_index: int = 0) -> Div:
             ),
             style="display: none",
         ),
+        # Keyboard navigation with click support (window-level)
+        Span(
+            data_on_keydown=(
+                """
+                if (evt.key === 'ArrowRight' || evt.key === ' ') {
+                    evt.preventDefault();
+                    if ($clicks < $max_clicks) {
+                        $clicks++;
+                    } else {
+                        $clicks = 0;
+                        @get('/api/slide/next');
+                    }
+                } else if (evt.key === 'ArrowLeft') {
+                    evt.preventDefault();
+                    if ($clicks > 0) {
+                        $clicks--;
+                    } else {
+                        @get('/api/slide/prev');
+                    }
+                }
+                """,
+                {"window": True},
+            ),
+            style="display: none",
+        ),
         # Main layout - two panels
         Div(
             # Current slide panel

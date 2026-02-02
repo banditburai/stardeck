@@ -74,3 +74,10 @@ def test_presenter_navigation_updates_audience(client: TestClient):
     html = response.text
     # Presenter should have navigation that updates server state
     assert "/api/slide/" in html
+
+
+def test_presenter_has_keyboard_navigation(client: TestClient):
+    """Test that presenter view has keyboard navigation handler."""
+    response = client.get("/presenter")
+    html = response.text
+    assert "data-on-keydown" in html or "data-on:keydown" in html
