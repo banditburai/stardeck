@@ -120,14 +120,27 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default", 
                 ),
                 cls="navigation-bar",
             ),
-            # Keyboard navigation (window-level)
+            # Keyboard navigation with click support (window-level)
             Span(
                 data_on_keydown=(
-                    [
-                        (evt.key == "ArrowRight") & get("/api/slide/next"),
-                        (evt.key == " ") & get("/api/slide/next"),
-                        (evt.key == "ArrowLeft") & get("/api/slide/prev"),
-                    ],
+                    """
+                    if (evt.key === 'ArrowRight' || evt.key === ' ') {
+                        evt.preventDefault();
+                        if ($clicks < $max_clicks) {
+                            $clicks++;
+                        } else {
+                            $clicks = 0;
+                            @get('/api/slide/next');
+                        }
+                    } else if (evt.key === 'ArrowLeft') {
+                        evt.preventDefault();
+                        if ($clicks > 0) {
+                            $clicks--;
+                        } else {
+                            @get('/api/slide/prev');
+                        }
+                    }
+                    """,
                     {"window": True},
                 ),
                 style="display: none",

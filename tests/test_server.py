@@ -111,3 +111,12 @@ def test_home_has_clicks_signal(client: TestClient):
     assert "clicks" in html
     # Verify data-signals attribute is present (StarHTML signal initialization)
     assert "data-signals" in html
+
+
+def test_keyboard_navigation_with_clicks(client: TestClient):
+    """Test that keyboard navigation includes click increment/decrement logic."""
+    response = client.get("/")
+    html = response.text
+    # Navigation logic should compare clicks to max_clicks
+    # This indicates click-aware navigation is implemented
+    assert "$clicks < $max_clicks" in html or "clicks < max_clicks" in html
