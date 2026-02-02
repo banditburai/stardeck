@@ -1,0 +1,139 @@
+"""Tests for stardeck drawing data models."""
+
+
+def test_drawing_element_creation():
+    """Point and PenElement should be creatable with required fields."""
+    from stardeck.drawing import PenElement, Point
+
+    point = Point(x=10.0, y=20.0, pressure=0.5)
+    assert point.x == 10.0
+    assert point.y == 20.0
+    assert point.pressure == 0.5
+
+    element = PenElement(
+        id="el-1",
+        type="pen",
+        stroke_color="#ff0000",
+        stroke_width=2,
+        points=[point],
+        slide_index=0,
+    )
+    assert element.type == "pen"
+    assert len(element.points) == 1
+    assert element.id == "el-1"
+    assert element.stroke_color == "#ff0000"
+    assert element.stroke_width == 2
+    assert element.slide_index == 0
+
+
+def test_point_pressure_defaults():
+    """Point pressure should default to 1.0."""
+    from stardeck.drawing import Point
+
+    point = Point(x=50.0, y=50.0)
+    assert point.pressure == 1.0
+
+
+def test_line_element_creation():
+    """LineElement should support start and end arrows."""
+    from stardeck.drawing import LineElement, Point
+
+    element = LineElement(
+        id="line-1",
+        type="line",
+        stroke_color="#0000ff",
+        stroke_width=2,
+        points=[Point(10, 10), Point(90, 90)],
+        start_arrow=False,
+        end_arrow=True,
+        slide_index=0,
+    )
+    assert element.type == "line"
+    assert len(element.points) == 2
+    assert element.start_arrow is False
+    assert element.end_arrow is True
+
+
+def test_shape_element_creation():
+    """ShapeElement should store x, y, width, height."""
+    from stardeck.drawing import ShapeElement
+
+    element = ShapeElement(
+        id="rect-1",
+        type="rect",
+        x=10.0,
+        y=20.0,
+        width=50.0,
+        height=30.0,
+        stroke_color="#00ff00",
+        stroke_width=2,
+        fill_color=None,
+        slide_index=0,
+    )
+    assert element.type == "rect"
+    assert element.x == 10.0
+    assert element.y == 20.0
+    assert element.width == 50.0
+    assert element.height == 30.0
+    assert element.fill_color is None
+
+
+def test_text_element_creation():
+    """TextElement should store text content and styling."""
+    from stardeck.drawing import TextElement
+
+    element = TextElement(
+        id="text-1",
+        type="text",
+        x=50.0,
+        y=50.0,
+        text="Hello World",
+        font_size=16,
+        font_family="sans-serif",
+        stroke_color="#000000",
+        slide_index=0,
+    )
+    assert element.text == "Hello World"
+    assert element.font_size == 16
+    assert element.font_family == "sans-serif"
+
+
+def test_drawing_state_add_element():
+    """DrawingState should track elements by slide index."""
+    from stardeck.drawing import DrawingState, PenElement, Point
+
+    state = DrawingState()
+    element = PenElement(
+        id="el-1",
+        type="pen",
+        stroke_color="#f00",
+        stroke_width=2,
+        points=[Point(0, 0)],
+        slide_index=0,
+    )
+    state.add_element(element)
+
+    assert len(state.elements[0]) == 1
+    assert state.elements[0][0].id == "el-1"
+
+
+def test_drawing_state_multiple_slides():
+    """DrawingState should keep elements separated by slide."""
+    from stardeck.drawing import DrawingState, PenElement, Point
+
+    state = DrawingState()
+    el1 = PenElement(
+        id="el-1", type="pen", stroke_color="#f00",
+        stroke_width=2, points=[Point(0, 0)], slide_index=0
+    )
+    el2 = PenElement(
+        id="el-2", type="pen", stroke_color="#0f0",
+        stroke_width=2, points=[Point(10, 10)], slide_index=1
+    )
+    state.add_element(el1)
+    state.add_element(el2)
+
+    assert len(state.elements[0]) == 1
+    assert len(state.elements[1]) == 1
+    assert state.elements[0][0].id == "el-1"
+    assert state.elements[1][0].id == "el-2"
