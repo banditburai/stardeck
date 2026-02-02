@@ -19,6 +19,7 @@ from starhtml import (
 from starlette.responses import JSONResponse
 
 from stardeck.parser import parse_deck
+from stardeck.presenter import create_presenter_view
 from stardeck.renderer import render_slide
 from stardeck.themes import get_theme_css
 
@@ -176,6 +177,10 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default", 
             ) if deck_state.get("watch") else None,
             cls="stardeck-root",
         )
+
+    @rt("/presenter")
+    def presenter():
+        return create_presenter_view(deck_state["deck"])
 
     @rt("/api/slide/next")
     @sse
