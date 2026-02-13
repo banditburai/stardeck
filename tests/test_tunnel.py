@@ -2,7 +2,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
-
 from stardeck.cli import cli
 from stardeck.tunnel import start_tunnel, stop_tunnel
 
@@ -22,11 +21,14 @@ def test_url_extraction():
         patch("stardeck.tunnel.shutil.which", return_value="/usr/bin/ssh"),
         patch("stardeck.tunnel.subprocess.Popen", return_value=mock_proc),
         patch("stardeck.tunnel.select.select", return_value=([99], [], [])),
-        patch("stardeck.tunnel.os.read", side_effect=[
-            b"Warning: Permanently added 'a.pinggy.io' to known hosts.\n",
-            b"http://rndzz-123.a.free.pinggy.link\n",
-            b"https://rndzz-123.a.free.pinggy.link\n",
-        ]),
+        patch(
+            "stardeck.tunnel.os.read",
+            side_effect=[
+                b"Warning: Permanently added 'a.pinggy.io' to known hosts.\n",
+                b"http://rndzz-123.a.free.pinggy.link\n",
+                b"https://rndzz-123.a.free.pinggy.link\n",
+            ],
+        ),
         patch("stardeck.tunnel.threading.Thread") as mock_thread,
     ):
         proc, url = start_tunnel(5001)
@@ -79,9 +81,12 @@ def test_start_tunnel_uses_pro_host_with_token():
         patch("stardeck.tunnel.shutil.which", return_value="/usr/bin/ssh"),
         patch("stardeck.tunnel.subprocess.Popen", return_value=mock_proc) as mock_popen,
         patch("stardeck.tunnel.select.select", return_value=([99], [], [])),
-        patch("stardeck.tunnel.os.read", side_effect=[
-            b"https://myapp.a.pinggy.online\n",
-        ]),
+        patch(
+            "stardeck.tunnel.os.read",
+            side_effect=[
+                b"https://myapp.a.pinggy.online\n",
+            ],
+        ),
         patch("stardeck.tunnel.threading.Thread"),
     ):
         start_tunnel(5001, token="abc123")

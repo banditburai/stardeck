@@ -3,7 +3,6 @@
 import asyncio
 
 import pytest
-
 from stardeck.server import FileWatcher
 
 

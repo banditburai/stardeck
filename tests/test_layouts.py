@@ -2,11 +2,10 @@
 
 from pathlib import Path
 
-from starhtml import to_xml
-
 from stardeck.models import Deck, DeckConfig, SlideInfo
 from stardeck.parser import transform_regions
 from stardeck.renderer import render_slide
+from starhtml import to_xml
 
 
 def _deck(slide):
@@ -194,9 +193,7 @@ def test_parse_deck_regions_and_clicks(tmp_path):
 
     md = tmp_path / "slides.md"
     md.write_text(
-        "---\nlayout: two-cols\n---\n"
-        "<left>\n\n## Left\n\n</left>\n\n"
-        "<right>\n\n<click>Reveal</click>\n\n</right>"
+        "---\nlayout: two-cols\n---\n<left>\n\n## Left\n\n</left>\n\n<right>\n\n<click>Reveal</click>\n\n</right>"
     )
     deck = parse_deck(md)
     slide = deck.slides[0]

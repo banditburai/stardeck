@@ -1,34 +1,8 @@
 """Tests for stardeck drawing system (star-drawing web component integration)."""
 
-import pytest
 from pathlib import Path
+
 from starlette.testclient import TestClient
-
-
-@pytest.fixture
-def app_with_state(tmp_path: Path):
-    """Create an app with deck state."""
-    from stardeck.server import create_app
-
-    md_file = tmp_path / "slides.md"
-    md_file.write_text("# Slide 1\n---\n# Slide 2")
-
-    app, rt, deck_state = create_app(md_file)
-    return app, deck_state
-
-
-@pytest.fixture
-def client(app_with_state):
-    """Create a test client."""
-    app, _ = app_with_state
-    return TestClient(app)
-
-
-@pytest.fixture
-def presenter_token(app_with_state):
-    """Get the presenter token for authentication."""
-    _, deck_state = app_with_state
-    return deck_state["presenter_token"]
 
 
 def test_audience_has_drawing_canvas(client):
@@ -69,10 +43,13 @@ def test_drawing_store_delete():
     from stardeck.models import DrawingStore
 
     store = DrawingStore()
-    store.apply_changes(0, [
-        {"type": "create", "element": {"id": "el-1", "kind": "pen"}},
-        {"type": "create", "element": {"id": "el-2", "kind": "rect"}},
-    ])
+    store.apply_changes(
+        0,
+        [
+            {"type": "create", "element": {"id": "el-1", "kind": "pen"}},
+            {"type": "create", "element": {"id": "el-2", "kind": "rect"}},
+        ],
+    )
     store.apply_changes(0, [{"type": "delete", "elementId": "el-1"}])
 
     snapshot = store.get_snapshot(0)
@@ -85,12 +62,18 @@ def test_drawing_store_update():
     from stardeck.models import DrawingStore
 
     store = DrawingStore()
-    store.apply_changes(0, [
-        {"type": "create", "element": {"id": "el-1", "color": "red"}},
-    ])
-    store.apply_changes(0, [
-        {"type": "update", "element": {"id": "el-1", "color": "blue"}},
-    ])
+    store.apply_changes(
+        0,
+        [
+            {"type": "create", "element": {"id": "el-1", "color": "red"}},
+        ],
+    )
+    store.apply_changes(
+        0,
+        [
+            {"type": "update", "element": {"id": "el-1", "color": "blue"}},
+        ],
+    )
 
     snapshot = store.get_snapshot(0)
     elements = [c["element"] for c in snapshot if c["type"] == "create"]
@@ -116,11 +99,14 @@ def test_drawing_store_reorder():
     from stardeck.models import DrawingStore
 
     store = DrawingStore()
-    store.apply_changes(0, [
-        {"type": "create", "element": {"id": "a"}},
-        {"type": "create", "element": {"id": "b"}},
-        {"type": "create", "element": {"id": "c"}},
-    ])
+    store.apply_changes(
+        0,
+        [
+            {"type": "create", "element": {"id": "a"}},
+            {"type": "create", "element": {"id": "b"}},
+            {"type": "create", "element": {"id": "c"}},
+        ],
+    )
     store.apply_changes(0, [{"type": "reorder", "order": ["c", "a", "b"]}])
 
     snapshot = store.get_snapshot(0)
@@ -145,13 +131,13 @@ def test_drawing_store_empty_snapshot():
 
 def test_presentation_state_has_drawing_store(tmp_path: Path):
     """PresentationState should include DrawingStore."""
-    from stardeck.server import create_app
     from stardeck.models import DrawingStore
+    from stardeck.server import create_app
 
     md_file = tmp_path / "slides.md"
     md_file.write_text("# Slide 1")
 
-    app, rt, deck_state = create_app(md_file)
+    _app, _rt, deck_state = create_app(md_file)
     pres = deck_state["presentation"]
 
     assert hasattr(pres, "drawing")

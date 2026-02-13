@@ -1,9 +1,8 @@
 """Tests for stardeck renderer."""
 
-from starhtml import to_xml
-
 from stardeck.models import Deck, DeckConfig, SlideInfo
 from stardeck.renderer import render_code_block, render_slide
+from starhtml import to_xml
 
 
 def _slide(content="<h1>Hi</h1>", index=0, frontmatter=None):

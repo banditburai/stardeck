@@ -173,8 +173,8 @@ def test_parse_deck_with_frontmatter(tmp_path):
     content = "---\nlayout: cover\n---\n# Title Slide\n---\n# Regular Slide"
     md_file.write_text(content)
     deck = parse_deck(md_file)
-    has_cover_layout = any(s.layout == "cover" for s in deck.slides)
-    assert has_cover_layout or deck.total >= 2
+    assert deck.slides[0].layout == "cover"
+    assert deck.slides[1].layout == "default"
 
 
 def test_parse_deck_with_notes(tmp_path):
