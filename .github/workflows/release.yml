@@ -1,0 +1,92 @@
+name: Release to PyPI
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  build:
+    name: Build distribution
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+
+    - name: Set up Python
+      run: uv python install 3.12
+
+    - name: Install build dependencies
+      run: uv sync --all-extras
+
+    - name: Run tests before release
+      run: uv run pytest tests/ -v --tb=short
+
+    - name: Build package
+      run: uv build
+
+    - name: Validate package
+      run: |
+        uv run pip install check-wheel-contents
+        uv run check-wheel-contents dist/*.whl
+
+    - name: Store distribution packages
+      uses: actions/upload-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/stardeck
+    permissions:
+      id-token: write
+    steps:
+    - name: Download distributions
+      uses: actions/download-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    name: Create GitHub Release
+    needs: publish-pypi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v4
+    - name: Download distributions
+      uses: actions/download-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+    - name: Detect pre-release
+      id: prerelease
+      run: |
+        TAG="${GITHUB_REF#refs/tags/}"
+        if [[ "$TAG" == *"a"* ]] || [[ "$TAG" == *"b"* ]] || [[ "$TAG" == *"rc"* ]] || [[ "$TAG" == *"dev"* ]]; then
+          echo "is_prerelease=true" >> $GITHUB_OUTPUT
+        else
+          echo "is_prerelease=false" >> $GITHUB_OUTPUT
+        fi
+    - name: Create GitHub Release
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        gh release create "$GITHUB_REF_NAME" dist/* \
+          --repo "$GITHUB_REPOSITORY" \
+          --generate-notes \
+          ${{ steps.prerelease.outputs.is_prerelease == 'true' && '--prerelease' || '' }}
