@@ -1,46 +1,19 @@
-"""StarDeck theme system.
+"""StarDeck theme system — CSS themes live in your codebase and can be customized."""
 
-Themes are directories containing CSS files and metadata.
-Inspired by ShadCN's approach - themes live in your codebase and can be customized.
-
-Structure:
-    stardeck/themes/
-    ├── __init__.py      # This file - theme loading
-    ├── default/
-    │   ├── __init__.py  # Theme metadata
-    │   └── styles.css   # Theme styles
-    └── dark/
-        ├── __init__.py
-        └── styles.css
-"""
-
-from importlib import resources
+from importlib import import_module, resources
 from pathlib import Path
+
+_THEMES_DIR = Path(__file__).parent
 
 
 def get_theme_css(theme_name: str = "default") -> str:
-    """Load CSS for a theme by name.
-
-    Args:
-        theme_name: Name of the theme directory (e.g., "default", "dark")
-
-    Returns:
-        CSS content as a string
-
-    Raises:
-        FileNotFoundError: If theme or styles.css doesn't exist
-    """
-    # Try to load from package resources first
+    """Load CSS for a theme by name. Raises FileNotFoundError if missing."""
     try:
-        theme_package = f"stardeck.themes.{theme_name}"
-        css_file = resources.files(theme_package).joinpath("styles.css")
-        return css_file.read_text()
+        return resources.files(f"stardeck.themes.{theme_name}").joinpath("styles.css").read_text()
     except (ModuleNotFoundError, FileNotFoundError, TypeError):
         pass
 
-    # Fallback: try loading from filesystem (for development)
-    themes_dir = Path(__file__).parent
-    css_path = themes_dir / theme_name / "styles.css"
+    css_path = _THEMES_DIR / theme_name / "styles.css"
     if css_path.exists():
         return css_path.read_text()
 
@@ -63,37 +36,23 @@ def deck_hdrs(theme: str = "default") -> list:
 
 
 def list_themes() -> list[str]:
-    """List available theme names.
-
-    Returns:
-        List of theme directory names
-    """
-    themes_dir = Path(__file__).parent
+    """List available theme names."""
     return [
         d.name
-        for d in themes_dir.iterdir()
+        for d in _THEMES_DIR.iterdir()
         if d.is_dir() and not d.name.startswith("_") and (d / "styles.css").exists()
     ]
 
 
 def get_theme_metadata(theme_name: str = "default") -> dict:
-    """Get metadata for a theme.
-
-    Args:
-        theme_name: Name of the theme
-
-    Returns:
-        Dict with theme metadata (name, description, author, etc.)
-    """
+    """Get metadata for a theme."""
     try:
-        theme_module = __import__(
-            f"stardeck.themes.{theme_name}", fromlist=["NAME", "DESCRIPTION"]
-        )
+        mod = import_module(f"stardeck.themes.{theme_name}")
         return {
-            "name": getattr(theme_module, "NAME", theme_name),
-            "description": getattr(theme_module, "DESCRIPTION", ""),
-            "author": getattr(theme_module, "AUTHOR", ""),
-            "version": getattr(theme_module, "VERSION", "1.0.0"),
+            "name": getattr(mod, "NAME", theme_name),
+            "description": getattr(mod, "DESCRIPTION", ""),
+            "author": getattr(mod, "AUTHOR", ""),
+            "version": getattr(mod, "VERSION", "1.0.0"),
         }
     except (ModuleNotFoundError, AttributeError):
         return {"name": theme_name, "description": "", "author": "", "version": "1.0.0"}
