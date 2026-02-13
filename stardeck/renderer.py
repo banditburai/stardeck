@@ -15,7 +15,9 @@ SLIDE_HEIGHT = 1080
 VIEWBOX_WIDTH = 160
 VIEWBOX_HEIGHT = 90
 
-HASH_UPDATE_EFFECT = js("window.history.replaceState(null, '', '#' + ($slide_index + 1) + ($clicks > 0 ? '.' + $clicks : ''))")
+HASH_UPDATE_EFFECT = js(
+    "window.history.replaceState(null, '', '#' + ($slide_index + 1) + ($clicks > 0 ? '.' + $clicks : ''))"
+)
 
 
 def _resolve_asset_url(raw: str) -> str:
@@ -94,7 +96,8 @@ def render_slide(slide: SlideInfo, deck: Deck) -> Div:
 
 def _grid_scaling_effect(root_cls: str):
     # CSS can't produce a unitless ratio from two lengths, so JS is needed
-    return js("""
+    return js(
+        """
         if ($grid_open) {
             requestAnimationFrame(() => {
                 const root = document.querySelector('.%s');
@@ -105,11 +108,16 @@ def _grid_scaling_effect(root_cls: str):
                 });
             });
         }
-    """ % root_cls)
+    """
+        % root_cls
+    )
 
 
 def build_grid_cards(
-    deck: Deck, slide_idx_signal, grid_open_signal, goto_url_fn: Callable[[int], str],
+    deck: Deck,
+    slide_idx_signal,
+    grid_open_signal,
+    goto_url_fn: Callable[[int], str],
 ) -> list:
     return [
         Div(

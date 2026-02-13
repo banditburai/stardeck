@@ -2,10 +2,9 @@
 
 from typing import TYPE_CHECKING
 
-from starhtml import Button, Div, H3, Signal, Span, get
-from starhtml.datastar import evt, js, seq
-
 from star_drawing import DrawingCanvas, drawing_toolbar
+from starhtml import H3, Button, Div, Signal, Span, get
+from starhtml.datastar import evt, js, seq
 
 from stardeck.models import Deck
 from stardeck.renderer import (
@@ -22,9 +21,7 @@ if TYPE_CHECKING:  # avoid circular import
     from stardeck.server import PresentationState
 
 
-def create_presenter_view(
-    deck: Deck, pres: "PresentationState", *, token: str = ""
-) -> Div:
+def create_presenter_view(deck: Deck, pres: "PresentationState", *, token: str = "") -> Div:
     current_slide = deck.slides[pres.slide_index]
     next_slide = deck.slides[pres.slide_index + 1] if pres.slide_index + 1 < deck.total else None
 
@@ -66,7 +63,9 @@ def create_presenter_view(
     grid_open = Signal("grid_open", False)
 
     grid_cards = build_grid_cards(
-        deck, slide_idx, grid_open,
+        deck,
+        slide_idx,
+        grid_open,
         lambda idx: f"/api/presenter/goto/{idx}",
     )
 
@@ -122,7 +121,9 @@ def create_presenter_view(
                     cls="presenter-next-panel",
                 ),
                 Div(
-                    data_text=js("Math.floor($elapsed/60).toString().padStart(2,'0')+':'+($elapsed%60).toString().padStart(2,'0')"),
+                    data_text=js(
+                        "Math.floor($elapsed/60).toString().padStart(2,'0')+':'+($elapsed%60).toString().padStart(2,'0')"
+                    ),
                     cls="presenter-timer",
                 ),
                 Div(
@@ -140,9 +141,23 @@ def create_presenter_view(
             Div(
                 toolbar,
                 Div(
-                    Button("← Prev", cls="presenter-nav-btn", data_on_click=get(prev_endpoint), data_attr_disabled=slide_idx == 0),
-                    Button(data_text=slide_idx + 1 + " / " + total, cls="presenter-slide-counter", data_on_click=grid_open.toggle()),
-                    Button("Next →", cls="presenter-nav-btn", data_on_click=get(next_endpoint), data_attr_disabled=slide_idx == total - 1),
+                    Button(
+                        "← Prev",
+                        cls="presenter-nav-btn",
+                        data_on_click=get(prev_endpoint),
+                        data_attr_disabled=slide_idx == 0,
+                    ),
+                    Button(
+                        data_text=slide_idx + 1 + " / " + total,
+                        cls="presenter-slide-counter",
+                        data_on_click=grid_open.toggle(),
+                    ),
+                    Button(
+                        "Next →",
+                        cls="presenter-nav-btn",
+                        data_on_click=get(next_endpoint),
+                        data_attr_disabled=slide_idx == total - 1,
+                    ),
                     cls="presenter-nav-bar",
                 ),
                 cls="presenter-bottom-bar",

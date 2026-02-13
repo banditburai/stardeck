@@ -7,6 +7,7 @@ import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+from star_drawing import DrawingCanvas
 from starhtml import (
     Button,
     Div,
@@ -23,10 +24,9 @@ from starhtml import (
     sse,
     star_app,
 )
-from starhtml.plugins import resize
 from starhtml.datastar import evt, js, seq
+from starhtml.plugins import resize
 from starhtml.realtime import SSE_HEADERS
-from star_drawing import DrawingCanvas
 from starlette.responses import JSONResponse, StreamingResponse
 
 from stardeck.models import DrawingStore
@@ -58,7 +58,7 @@ async def _sse_stream(relay, initial_events=None):
             try:
                 event = await asyncio.wait_for(queue.get(), timeout=_SSE_TIMEOUT)
                 yield format_event(event)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 yield ": keepalive\n\n"
     except asyncio.CancelledError:
         pass
@@ -67,7 +67,6 @@ async def _sse_stream(relay, initial_events=None):
 
 
 class FileWatcher:
-
     def __init__(self, path: Path, on_change):
         self.path = path.resolve()
         self.on_change = on_change
@@ -95,7 +94,6 @@ def _drawing_script(selector: str, data_json: str, *, clear: bool = False) -> st
 
 
 class PresentationState:
-
     def __init__(self, deck):
         self.deck = deck
         self.slide_index = 0
@@ -118,11 +116,13 @@ class PresentationState:
         return self.current_slide.max_clicks
 
     def broadcast(self):
-        self.relay.emit_signals({
-            "slide_index": self.slide_index,
-            "clicks": self.clicks,
-            "max_clicks": self.max_clicks,
-        })
+        self.relay.emit_signals(
+            {
+                "slide_index": self.slide_index,
+                "clicks": self.clicks,
+                "max_clicks": self.max_clicks,
+            }
+        )
         self.relay.emit_element(render_slide(self.current_slide, self.deck), "#slide-content")
         snapshot = self.drawing.get_snapshot(self.slide_index)
         snapshot_json = json.dumps(snapshot) if snapshot else "[]"
@@ -159,9 +159,7 @@ class PresentationState:
 
     def apply_and_broadcast_changes(self, slide_index: int, changes: list[dict]):
         self.drawing.apply_changes(slide_index, changes)
-        self.relay.emit_script(
-            _drawing_script(_AUDIENCE_CANVAS, json.dumps(changes))
-        )
+        self.relay.emit_script(_drawing_script(_AUDIENCE_CANVAS, json.dumps(changes)))
 
 
 def _yield_presenter_with_snapshot(pres):
@@ -183,18 +181,18 @@ def yield_presenter_updates(deck, slide_idx: int, clicks: int = 0, *, drawing_sn
     yield elements(render_slide(current_slide, deck), "#presenter-slide-content", "inner")
     yield elements(
         render_slide(next_slide, deck) if next_slide else Div("End of presentation"),
-        "#presenter-next", "inner",
+        "#presenter-next",
+        "inner",
     )
     yield elements(
         Div(current_slide.note or "No notes for this slide.", cls="presenter-notes-text"),
-        "#presenter-notes-content", "inner",
+        "#presenter-notes-content",
+        "inner",
     )
 
     if drawing_snapshot is not None:
         snapshot_json = json.dumps(drawing_snapshot) if drawing_snapshot else "[]"
-        yield execute_script(
-            _drawing_script("drawing-canvas", snapshot_json, clear=True)
-        )
+        yield execute_script(_drawing_script("drawing-canvas", snapshot_json, clear=True))
 
 
 def create_app(deck_path: Path, *, theme: str = "default", watch: bool = False):
@@ -271,7 +269,9 @@ def create_app(deck_path: Path, *, theme: str = "default", watch: bool = False):
         can_click_back = clicks > 0
 
         grid_cards = build_grid_cards(
-            deck, slide_index, grid_open,
+            deck,
+            slide_index,
+            grid_open,
             lambda idx: f"/api/slide/{idx}",
         )
 
@@ -306,16 +306,22 @@ def create_app(deck_path: Path, *, theme: str = "default", watch: bool = False):
             build_grid_modal(grid_cards, grid_open, "stardeck-root"),
             Div(
                 Button(
-                    "←", cls="nav-btn",
+                    "←",
+                    cls="nav-btn",
                     data_on_click=[
                         can_click_back.then(clicks.sub(1)),
                         (~can_click_back).then(get("/api/slide/prev")),
                     ],
                     data_attr_disabled=slide_index == 0,
                 ),
-                Button(data_text=slide_index + 1 + " / " + total_slides, cls="slide-counter", data_on_click=grid_open.toggle()),
                 Button(
-                    "→", cls="nav-btn",
+                    data_text=slide_index + 1 + " / " + total_slides,
+                    cls="slide-counter",
+                    data_on_click=grid_open.toggle(),
+                ),
+                Button(
+                    "→",
+                    cls="nav-btn",
                     data_on_click=[
                         can_click_fwd.then(clicks.add(1)),
                         (~can_click_fwd).then(seq(clicks.set(0), get("/api/slide/next"))),
@@ -331,9 +337,7 @@ def create_app(deck_path: Path, *, theme: str = "default", watch: bool = False):
                         (is_esc & grid_open).then(seq(evt.preventDefault(), grid_open.set(False))),
                         (not_grid & is_right).then(evt.preventDefault()),
                         (not_grid & is_right & can_click_fwd).then(clicks.add(1)),
-                        (not_grid & is_right & ~can_click_fwd).then(
-                            seq(clicks.set(0), get("/api/slide/next"))
-                        ),
+                        (not_grid & is_right & ~can_click_fwd).then(seq(clicks.set(0), get("/api/slide/next"))),
                         (not_grid & is_left).then(evt.preventDefault()),
                         (not_grid & is_left & can_click_back).then(clicks.sub(1)),
                         (not_grid & is_left & ~can_click_back).then(get("/api/slide/prev")),
@@ -363,18 +367,18 @@ def create_app(deck_path: Path, *, theme: str = "default", watch: bool = False):
     async def events():
         pres = deck_state["presentation"]
         initial = [
-            SignalEvent({
-                "slide_index": pres.slide_index,
-                "clicks": pres.clicks,
-                "max_clicks": pres.max_clicks,
-                "total_slides": pres.deck.total,
-            }),
+            SignalEvent(
+                {
+                    "slide_index": pres.slide_index,
+                    "clicks": pres.clicks,
+                    "max_clicks": pres.max_clicks,
+                    "total_slides": pres.deck.total,
+                }
+            ),
         ]
         snapshot = pres.drawing.get_snapshot(pres.slide_index)
         if snapshot:
-            initial.append(ScriptEvent(
-                _drawing_script(_AUDIENCE_CANVAS, json.dumps(snapshot))
-            ))
+            initial.append(ScriptEvent(_drawing_script(_AUDIENCE_CANVAS, json.dumps(snapshot))))
         return StreamingResponse(
             _sse_stream(pres.relay, initial),
             media_type="text/event-stream",

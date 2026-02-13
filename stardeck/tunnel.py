@@ -19,10 +19,14 @@ def start_tunnel(port: int, token: str | None = None) -> tuple[subprocess.Popen,
     host = "pro.pinggy.io" if token else "a.pinggy.io"
     target = f"{token}@{host}" if token else host
     cmd = [
-        "ssh", "-p", "443",
+        "ssh",
+        "-p",
+        "443",
         f"-R0:localhost:{port}",
-        "-o", "StrictHostKeyChecking=accept-new",
-        "-o", "ServerAliveInterval=30",
+        "-o",
+        "StrictHostKeyChecking=accept-new",
+        "-o",
+        "ServerAliveInterval=30",
         target,
     ]
 

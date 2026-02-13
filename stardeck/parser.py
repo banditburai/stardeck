@@ -110,11 +110,9 @@ def transform_click_tags(content: str) -> tuple[str, int]:
     parts = []
     last_end = 0
     for i, match in enumerate(matches, 1):
-        parts.append(content[last_end:match.start()])
+        parts.append(content[last_end : match.start()])
         parts.append(
-            f'<div class="click-reveal" data-click="{i}" '
-            f'data-class:revealed="$clicks >= {i}">'
-            f'{match.group(1)}</div>'
+            f'<div class="click-reveal" data-click="{i}" data-class:revealed="$clicks >= {i}">{match.group(1)}</div>'
         )
         last_end = match.end()
     parts.append(content[last_end:])
@@ -158,7 +156,7 @@ def extract_notes(content: str) -> tuple[str, str]:
     notes = "\n\n".join(m.group(1).strip() for m in matches)
     parts, last = [], 0
     for m in matches:
-        parts.append(content[last:m.start()])
+        parts.append(content[last : m.start()])
         last = m.end()
     parts.append(content[last:])
     return "".join(parts).strip(), notes
@@ -206,13 +204,15 @@ def parse_deck(filepath: Path) -> Deck:
         content = transform_regions(content)
         content, max_clicks = transform_click_tags(content)
 
-        slides.append(SlideInfo(
-            content=md.render(content),
-            index=idx,
-            frontmatter=frontmatter,
-            note=note,
-            max_clicks=max_clicks,
-        ))
+        slides.append(
+            SlideInfo(
+                content=md.render(content),
+                index=idx,
+                frontmatter=frontmatter,
+                note=note,
+                max_clicks=max_clicks,
+            )
+        )
 
     deck_fm = slides[0].frontmatter if slides else {}
     config_fields = {k: deck_fm[k] for k in ("title", "transition") if k in deck_fm and deck_fm[k]}

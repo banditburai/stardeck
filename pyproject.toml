@@ -3,6 +3,7 @@ name = "stardeck"
 version = "0.1.0"
 description = "Developer-first presentation tool - Slidev for Python"
 readme = "README.md"
+license = "Apache-2.0"
 requires-python = ">=3.12"
 dependencies = [
     "starhtml>=0.5.3",
@@ -17,7 +18,19 @@ dependencies = [
 [project.optional-dependencies]
 test = [
     "pytest",
+    "pytest-cov>=6.1.1",
+    "pytest-timeout",
     "pytest-asyncio",
+]
+dev = [
+    "ruff",
+    "pyright",
+]
+watch = [
+    "watchfiles",
+]
+tunnel = [
+    "pinggy",
 ]
 
 [project.scripts]
@@ -29,9 +42,97 @@ build-backend = "hatchling.build"
 
 [tool.pytest.ini_options]
 minversion = "7.0"
-addopts = ["--verbose", "--strict-markers", "--strict-config"]
+addopts = [
+    "--verbose",
+    "--strict-markers",
+    "--strict-config",
+]
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+
+[tool.coverage.run]
+source = ["stardeck"]
+omit = ["*/tests/*", "*/test_*.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "pass",
+    "except ImportError:",
+    "if TYPE_CHECKING:",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+src = ["stardeck", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C90", # mccabe complexity
+    "PL",  # pylint
+]
+ignore = [
+    "E501",     # Line length
+    "E701",     # Multiple statements on one line
+    "PLR0913",  # Too many arguments
+    "N802",     # Function names should be lowercase
+    "C901",     # Complex structure
+    "PLR0912",  # Too many branches
+    "PLW2901",  # Redefined loop name
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*.py" = ["PLR2004", "N806", "F841", "PLC0415", "B011"]
+"stardeck/cli.py" = ["PLC0415", "B904"]
+"stardeck/parser.py" = ["PLC0415"]
+"stardeck/renderer.py" = ["N802", "N803", "PLC0415", "UP031"]
+"stardeck/server.py" = ["PLR0915", "PLC0415"]
+"stardeck/presenter.py" = ["PLR0915"]
+"stardeck/export.py" = ["PLR0915"]
+"stardeck/themes/__init__.py" = ["PLC0415"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pyright]
+include = ["stardeck", "tests"]
+exclude = ["**/node_modules", "**/__pycache__", "**/.venv", "**/build", "**/dist"]
+pythonVersion = "3.12"
+pythonPlatform = "All"
+typeCheckingMode = "standard"
+reportMissingImports = false
+reportMissingTypeStubs = false
+reportPrivateImportUsage = false
+reportUnusedImport = false
+reportUnusedVariable = false
+reportOptionalMemberAccess = false
+reportOptionalCall = false
+reportCallIssue = false
+reportArgumentType = false
+reportUndefinedVariable = false
+reportAttributeAccessIssue = false
+reportAssignmentType = false
+reportPossiblyUnboundVariable = false
 
 [tool.uv.sources]
 starhtml = { path = "../starhtml-upstream", editable = true }

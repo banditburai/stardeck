@@ -75,15 +75,14 @@ def export_deck(deck_path: Path, output_dir: Path, theme: str = "default") -> Pa
                 clicks,
                 max_clicks,
                 total_slides,
-
                 Div(
                     Div(*slide_divs, id="slide-content", style="width:100%;height:100%"),
                     cls="slide-viewport",
                 ),
-
                 Div(
                     Button(
-                        "←", cls="nav-btn",
+                        "←",
+                        cls="nav-btn",
                         data_on_click=[
                             can_click_back.then(clicks.sub(1)),
                             (~can_click_back & can_slide_back).then(
@@ -98,7 +97,8 @@ def export_deck(deck_path: Path, output_dir: Path, theme: str = "default") -> Pa
                         cls="slide-counter",
                     ),
                     Button(
-                        "→", cls="nav-btn",
+                        "→",
+                        cls="nav-btn",
                         data_on_click=[
                             can_click_fwd.then(clicks.add(1)),
                             (~can_click_fwd & can_slide_fwd).then(
@@ -109,7 +109,6 @@ def export_deck(deck_path: Path, output_dir: Path, theme: str = "default") -> Pa
                     ),
                     cls="navigation-bar",
                 ),
-
                 Span(
                     data_on_keydown=(
                         [
@@ -128,11 +127,9 @@ def export_deck(deck_path: Path, output_dir: Path, theme: str = "default") -> Pa
                     ),
                     style="display:none",
                 ),
-
                 Span(data_on_load=hash_nav_js, style="display:none"),
                 Span(data_on_hashchange=(hash_nav_js, {"window": True}), style="display:none"),
                 Span(data_effect=HASH_UPDATE_EFFECT, style="display:none"),
-
                 cls="stardeck-root",
             ),
         ),
