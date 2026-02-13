@@ -21,7 +21,7 @@ def _is_yaml_like(text: str) -> bool:
         return False
     # Check if all non-empty lines look like YAML key: value
     for line in lines:
-        if not re.match(r"^[\w_-]+:\s*.+$", line):
+        if not re.match(r"^[\w_-]+:\s*.*$", line):
             return False
     return True
 
@@ -172,6 +172,52 @@ def transform_click_tags(content: str) -> tuple[str, int]:
     return result, max_clicks
 
 
+_REGION_TAGS = {"left", "right", "top", "bottom", "main", "sidebar", "item", "step"}
+_REGION_PATTERN = re.compile(
+    r"<(" + "|".join(_REGION_TAGS) + r")(\s[^>]*)?>(.+?)</\1>",
+    re.DOTALL,
+)
+
+
+def _extract_class_attr(attrs: str) -> str:
+    """Extract class="..." value from an attribute string."""
+    if not attrs:
+        return ""
+    m = re.search(r'class="([^"]*)"', attrs)
+    return m.group(1) if m else ""
+
+
+def transform_regions(content: str) -> str:
+    """Transform <left>...</left> region tags into div wrappers.
+
+    Skips content inside code fences. Extracts class attributes and
+    passes them through to the output div.
+    """
+    # Protect code fences from transformation
+    fences: list[str] = []
+    def _stash_fence(m: re.Match) -> str:
+        fences.append(m.group(0))
+        return f"\x00FENCE{len(fences) - 1}\x00"
+
+    protected = re.sub(r"```.*?```", _stash_fence, content, flags=re.DOTALL)
+
+    def _replace_region(m: re.Match) -> str:
+        tag = m.group(1)
+        attrs = m.group(2) or ""
+        inner = m.group(3).strip()
+        extra_class = _extract_class_attr(attrs)
+        cls = f"sd-region {extra_class}".strip() if extra_class else "sd-region"
+        return f'\n<div class="{cls}" data-region="{tag}">\n\n{inner}\n\n</div>\n'
+
+    result = _REGION_PATTERN.sub(_replace_region, protected)
+
+    # Restore code fences
+    for i, fence in enumerate(fences):
+        result = result.replace(f"\x00FENCE{i}\x00", fence)
+
+    return result
+
+
 def extract_notes(content: str) -> tuple[str, str]:
     """Extract speaker notes from HTML comments.
 
@@ -219,6 +265,14 @@ def _create_markdown_renderer() -> MarkdownIt:
         return f'<pre><code class="language-{lang}">{highlighted}</code></pre>\n'
 
     md.add_render_rule("fence", render_fence)
+
+    # cls= → class= in raw HTML (Pythonic alias, matching StarHTML convention)
+    def _cls_to_class(self, tokens, idx, options, env):
+        return re.sub(r"\bcls=", "class=", tokens[idx].content)
+
+    md.add_render_rule("html_block", _cls_to_class)
+    md.add_render_rule("html_inline", _cls_to_class)
+
     return md
 
 
@@ -242,6 +296,9 @@ def parse_deck(filepath: Path) -> Deck:
         # Extract notes
         content, note = extract_notes(content)
 
+        # Transform region tags before clicks and markdown
+        content = transform_regions(content)
+
         # Transform click tags before markdown rendering
         content, max_clicks = transform_click_tags(content)
 
@@ -260,9 +317,12 @@ def parse_deck(filepath: Path) -> Deck:
         )
         slides.append(slide)
 
+    # Deck-level config from first slide's frontmatter
+    deck_fm = slides[0].frontmatter if slides else {}
+    config_fields = {k: deck_fm[k] for k in ("title", "theme", "transition") if k in deck_fm and deck_fm[k]}
     return Deck(
         slides=slides,
-        config=DeckConfig(),
+        config=DeckConfig(**config_fields),
         filepath=filepath,
         raw=raw_content,
     )

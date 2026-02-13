@@ -60,8 +60,19 @@ def test_reload_endpoint(client: TestClient):
     assert "text/event-stream" in response.headers["content-type"]
 
 
-def test_watch_status_endpoint(tmp_path: Path):
-    """Test that /api/watch-status returns timestamp for polling."""
+def test_watch_creates_relay(tmp_path: Path):
+    """Test that watch=True creates a watch_relay in deck_state."""
+    from stardeck.server import create_app
+
+    md_file = tmp_path / "slides.md"
+    md_file.write_text("# Test Slide")
+
+    app, rt, deck_state = create_app(md_file, watch=True)
+    assert "watch_relay" in deck_state
+
+
+def test_watch_home_has_sse_elements(tmp_path: Path):
+    """Test that watch=True adds SSE-driven reload elements to home page."""
     from stardeck.server import create_app
 
     md_file = tmp_path / "slides.md"
@@ -70,37 +81,38 @@ def test_watch_status_endpoint(tmp_path: Path):
     app, rt, deck_state = create_app(md_file, watch=True)
     client = TestClient(app)
 
-    response = client.get("/api/watch-status")
-    assert response.status_code == 200
-    data = response.json()
-    assert "timestamp" in data
-    assert isinstance(data["timestamp"], int)
-    assert data["timestamp"] > 0
+    html = client.get("/").text
+    assert "file_version" in html
+    assert "watch-events" in html
 
 
-def test_watch_status_updates_on_file_change(tmp_path: Path):
-    """Test that watch timestamp changes when updated."""
+def test_watch_disabled_no_sse_elements(tmp_path: Path):
+    """Test that watch=False omits watch SSE elements from home page."""
     from stardeck.server import create_app
 
     md_file = tmp_path / "slides.md"
     md_file.write_text("# Test Slide")
 
-    app, rt, deck_state = create_app(md_file, watch=True)
+    app, rt, deck_state = create_app(md_file, watch=False)
     client = TestClient(app)
 
-    # Get initial timestamp
-    response1 = client.get("/api/watch-status")
-    timestamp1 = response1.json()["timestamp"]
+    html = client.get("/").text
+    assert "file_version" not in html
+    assert "watch-events" not in html
 
-    # Simulate file change by updating reload_timestamp
-    import time
-    deck_state["reload_timestamp"] = int(time.time() * 1000) + 1000
 
-    # Get new timestamp
-    response2 = client.get("/api/watch-status")
-    timestamp2 = response2.json()["timestamp"]
+def test_watch_events_disabled_without_watch(tmp_path: Path):
+    """Test that /api/watch-events returns 404 when watch=False."""
+    from stardeck.server import create_app
 
-    assert timestamp2 > timestamp1
+    md_file = tmp_path / "slides.md"
+    md_file.write_text("# Test Slide")
+
+    app, rt, deck_state = create_app(md_file, watch=False)
+    client = TestClient(app)
+
+    response = client.get("/api/watch-events")
+    assert response.status_code == 404
 
 
 def test_home_has_clicks_signal(client: TestClient):

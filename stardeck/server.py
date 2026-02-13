@@ -4,6 +4,7 @@ import asyncio
 import json
 import secrets
 import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from starhtml import (
@@ -154,16 +155,35 @@ def yield_presenter_updates(deck, slide_idx: int, clicks: int = 0, *, drawing_sn
 
 
 def create_app(deck_path: Path, *, theme: str = "default", watch: bool = False):
+    deck_path = deck_path.resolve()
     initial_deck = parse_deck(deck_path)
     presenter_token = secrets.token_urlsafe(16)
     deck_state = {
         "deck": initial_deck,
         "path": deck_path,
         "watch": watch,
-        "reload_timestamp": int(time.time() * 1000),
         "presentation": PresentationState(initial_deck),
         "presenter_token": presenter_token,
     }
+
+    watch_lifespan = None
+    if watch:
+        from stardeck.watch import FileWatcher
+
+        deck_state["watch_relay"] = Relay()
+
+        def _on_file_change():
+            deck_state["watch_relay"].emit_signals({"file_version": int(time.time() * 1000)})
+
+        watcher = FileWatcher(deck_path, _on_file_change)
+
+        @asynccontextmanager
+        async def watch_lifespan(app):
+            task = asyncio.create_task(watcher.start())
+            yield
+            watcher.stop()
+            task.cancel()
+
     theme_css = get_theme_css(theme)
     deck = deck_state["deck"]
 
@@ -176,6 +196,7 @@ def create_app(deck_path: Path, *, theme: str = "default", watch: bool = False):
             Style(theme_css),
         ],
         live=False,
+        lifespan=watch_lifespan,
     )
     app.register(DrawingCanvas)
     app.register(resize)
@@ -322,23 +343,9 @@ def create_app(deck_path: Path, *, theme: str = "default", watch: bool = False):
                 data_effect=js("window.history.replaceState(null, '', '#' + ($slide_index + 1) + ($clicks > 0 ? '.' + $clicks : ''))"),
                 style="display:none",
             ),
-            Span(
-                Signal("watch_ts", deck_state["reload_timestamp"]),
-                data_on_interval=(
-                    js("""
-                    fetch('/api/watch-status')
-                        .then(r => r.json())
-                        .then(data => {
-                            if (data.timestamp > $watch_ts) {
-                                $watch_ts = data.timestamp;
-                                @get('/api/reload')
-                            }
-                        })
-                    """),
-                    {"duration": "1s"},
-                ),
-                style="display:none",
-            ) if deck_state.get("watch") else None,
+            Signal("file_version", 0) if watch else None,
+            Span(data_on_load="@get('/api/watch-events')", style="display:none") if watch else None,
+            Span(data_effect=js("if ($file_version > 0) @get('/api/reload')"), style="display:none") if watch else None,
             cls="stardeck-root",
         )
 
@@ -454,12 +461,31 @@ def create_app(deck_path: Path, *, theme: str = "default", watch: bool = False):
     def reload_deck(slide_index: int = 0):
         deck_state["deck"] = parse_deck(deck_state["path"])
         current_deck = deck_state["deck"]
+        deck_state["presentation"].reload_deck(current_deck)
         idx = min(slide_index, current_deck.total - 1)
         yield signals(total_slides=current_deck.total)
         yield from yield_audience_updates(current_deck, idx)
 
-    @rt("/api/watch-status")
-    def watch_status():
-        return JSONResponse({"timestamp": deck_state.get("reload_timestamp", 0)})
+    @rt("/api/watch-events")
+    async def watch_events():
+        relay = deck_state.get("watch_relay")
+        if not relay:
+            return JSONResponse({"error": "watch not enabled"}, status_code=404)
+        queue = relay.subscribe()
+
+        async def stream():
+            try:
+                while True:
+                    try:
+                        event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                        yield format_event(event)
+                    except asyncio.TimeoutError:
+                        yield ": keepalive\n\n"
+            except asyncio.CancelledError:
+                pass
+            finally:
+                relay.unsubscribe(queue)
+
+        return StreamingResponse(stream(), media_type="text/event-stream", headers=SSE_HEADERS)
 
     return app, rt, deck_state

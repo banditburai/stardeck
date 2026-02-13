@@ -54,10 +54,11 @@
     left: 50%;
     top: 50%;
     transform-origin: center center;
+    /* Centered fallback before Datastar's reactive scale kicks in */
+    transform: translate(-50%, -50%) scale(0.5);
     /* 2x browser default (16px) so em-based slide typography renders at
        the correct size for a 1920px canvas (≈2x a typical 960px viewport) */
     font-size: 32px;
-    /* transform applied reactively via data_attr_style */
 }
 
 /* Slide content wrapper - fills scaler so .slide backgrounds work */
@@ -89,6 +90,281 @@
 .layout-default {
     justify-content: flex-start;
 }
+
+/* --- Tier 1: Slidev parity --- */
+
+.layout-center {
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
+.layout-section {
+    justify-content: center;
+    border-left: 0.25em solid var(--accent);
+    padding-left: 3em;
+}
+
+.layout-section h1 {
+    font-size: 3.5em;
+}
+
+.layout-quote {
+    justify-content: center;
+    padding: 4em 8em;
+}
+
+.layout-quote blockquote {
+    font-size: 1.75em;
+    font-style: italic;
+    line-height: 1.5;
+    border-left: 0.2em solid var(--accent);
+    padding-left: 1em;
+    margin: 0;
+    color: var(--text-heading);
+}
+
+.layout-quote blockquote p:last-child {
+    font-size: 0.6em;
+    font-style: normal;
+    color: var(--text-secondary);
+    margin-top: 0.5em;
+}
+
+.layout-fact {
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
+.layout-fact h1 {
+    font-size: 6em;
+    line-height: 1;
+}
+
+.layout-fact p {
+    font-size: 1.5em;
+    color: var(--text-secondary);
+}
+
+.layout-full {
+    padding: 0;
+}
+
+.layout-two-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2em;
+    align-content: start;
+    align-items: start;
+}
+
+.layout-two-cols > h1,
+.layout-two-cols > h2,
+.layout-two-cols > h3,
+.layout-two-cols > p:first-child {
+    grid-column: 1 / -1;
+}
+
+.layout-image-left,
+.layout-image-right {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    padding: 0;
+}
+
+.layout-image-left > .slot-image,
+.layout-image-right > .slot-image {
+    width: 100%;
+    height: 100%;
+}
+
+.layout-image-left > .slot-content,
+.layout-image-right > .slot-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 4em;
+}
+
+.layout-image-right > .slot-image {
+    order: 2;
+}
+
+/* --- Tier 2: Beyond Slidev --- */
+
+.layout-hero {
+    display: grid;
+    grid-template-rows: 1fr 1fr;
+    gap: 0;
+    padding: 0;
+}
+
+.layout-hero > .slot-image {
+    width: 100%;
+    height: 100%;
+}
+
+.layout-hero > .slot-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 2em 6em;
+}
+
+.layout-caption {
+    position: relative;
+    padding: 0;
+}
+
+.layout-caption > .slot-image {
+    position: absolute;
+    inset: 0;
+}
+
+.layout-caption > .slot-content {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 2em 4em;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
+    color: var(--text-heading);
+}
+
+.layout-statement {
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
+.layout-statement h1 {
+    font-size: 4.5em;
+    line-height: 1.1;
+}
+
+.layout-three-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 2em;
+    align-content: start;
+    align-items: start;
+}
+
+.layout-three-cols > h1,
+.layout-three-cols > h2,
+.layout-three-cols > h3,
+.layout-three-cols > p:first-child {
+    grid-column: 1 / -1;
+}
+
+.layout-sidebar-left {
+    display: grid;
+    grid-template-columns: 1fr 3fr;
+    gap: 2em;
+    align-content: start;
+    align-items: start;
+}
+
+.layout-sidebar-right {
+    display: grid;
+    grid-template-columns: 3fr 1fr;
+    gap: 2em;
+    align-content: start;
+    align-items: start;
+}
+
+.layout-comparison {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2em;
+    align-content: start;
+    align-items: start;
+}
+
+.layout-comparison > h1,
+.layout-comparison > h2,
+.layout-comparison > h3,
+.layout-comparison > p:first-child {
+    grid-column: 1 / -1;
+}
+
+.layout-grid {
+    display: grid;
+    grid-template-columns: repeat(var(--grid-cols, 2), 1fr);
+    gap: 2em;
+    align-content: start;
+    align-items: start;
+}
+
+.layout-grid > h1,
+.layout-grid > h2,
+.layout-grid > h3,
+.layout-grid > p:first-child {
+    grid-column: 1 / -1;
+}
+
+.layout-steps {
+    display: flex;
+    flex-direction: column;
+    counter-reset: step;
+}
+
+.layout-steps > h1,
+.layout-steps > h2,
+.layout-steps > h3 {
+    margin-bottom: 1em;
+}
+
+.layout-steps > .sd-region[data-region="step"] {
+    counter-increment: step;
+    padding-left: 3em;
+    padding-bottom: 1.5em;
+    border-left: 2px solid var(--border-color);
+    position: relative;
+    margin-left: 1em;
+}
+
+.layout-steps > .sd-region[data-region="step"]::before {
+    content: counter(step);
+    position: absolute;
+    left: -1.1em;
+    top: 0;
+    width: 2em;
+    height: 2em;
+    background: var(--accent);
+    color: var(--bg-dark);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.9em;
+}
+
+/* --- Region base --- */
+
+.sd-region {
+    min-width: 0;
+}
+
+/* --- Presentation utility classes --- */
+
+.text-hero     { font-size: 4em; }
+.text-title    { font-size: 3em; }
+.text-subtitle { font-size: 2em; }
+.text-body     { font-size: 1.25em; }
+.text-small    { font-size: 1em; }
+.text-caption  { font-size: 0.75em; }
+
+.text-accent  { color: var(--accent); }
+.text-heading { color: var(--text-heading); }
+.text-muted   { color: var(--text-secondary); }
+
+.slide.slide-p-0  { padding: 0; }
+.slide.slide-p-sm { padding: 2em 3em; }
+.slide.slide-p-lg { padding: 6em 8em; }
 
 /* Typography in slides */
 .slide h1 {

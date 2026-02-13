@@ -88,6 +88,15 @@ def test_parse_frontmatter_empty():
     assert content == "# Title"
 
 
+def test_parse_frontmatter_empty_value():
+    """Frontmatter with empty value (class:) should parse as None."""
+    raw = "---\nclass:\n---\n# Title"
+    fm, content = parse_frontmatter(raw)
+    assert "class" in fm
+    assert fm["class"] is None
+    assert content.strip() == "# Title"
+
+
 def test_extract_notes():
     """extract_notes should extract speaker notes from HTML comments."""
     content = "# Slide\n<!-- notes\nSpeaker notes here\n-->"
@@ -167,6 +176,14 @@ def test_parse_deck_stores_raw(tmp_path):
     md_file.write_text(content)
     deck = parse_deck(md_file)
     assert deck.slides[0].raw == content
+
+
+def test_split_slides_empty_value_frontmatter():
+    """split_slides should recognize frontmatter with empty values like class:."""
+    content = "# Slide 1\n---\nclass:\n---\n# Slide 2"
+    result = split_slides(content)
+    assert len(result) == 2
+    assert "class:" in result[1][0]
 
 
 def test_split_slides_mid_deck_frontmatter():
@@ -270,3 +287,21 @@ def test_parse_deck_with_click_tags(tmp_path):
     assert deck.slides[0].max_clicks == 2
     assert 'data-click="1"' in deck.slides[0].content
     assert 'data-click="2"' in deck.slides[0].content
+
+
+def test_cls_to_class_in_html(tmp_path):
+    """cls= in inline HTML should become class= (StarHTML convention)."""
+    md_file = tmp_path / "slides.md"
+    md_file.write_text('<div cls="text-blue-500 p-4">styled</div>')
+    deck = parse_deck(md_file)
+    assert 'class="text-blue-500 p-4"' in deck.slides[0].content
+    assert "cls=" not in deck.slides[0].content
+
+
+def test_cls_preserved_in_code_blocks(tmp_path):
+    """cls= inside code fences should NOT be transformed."""
+    md_file = tmp_path / "slides.md"
+    md_file.write_text('```html\n<div cls="example">demo</div>\n```')
+    deck = parse_deck(md_file)
+    # Code blocks render via Pygments — cls should remain as-is in the source
+    assert "cls" in deck.slides[0].content
