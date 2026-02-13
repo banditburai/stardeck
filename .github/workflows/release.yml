@@ -1,20 +1,28 @@
-name: Release to PyPI
+name: Release to PyPI and GitHub
 
 on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.1.0)'
+        required: true
+        type: string
 
 permissions:
-  contents: write
-  id-token: write
+  contents: read
 
 jobs:
-  build:
-    name: Build distribution
+  build-and-validate:
+    name: Build and Validate Package
     runs-on: ubuntu-latest
+
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: Install uv
       uses: astral-sh/setup-uv@v4
@@ -22,7 +30,7 @@ jobs:
     - name: Set up Python
       run: uv python install 3.12
 
-    - name: Install build dependencies
+    - name: Install dependencies
       run: uv sync --all-extras
 
     - name: Run tests before release
@@ -36,57 +44,97 @@ jobs:
         uv run pip install check-wheel-contents
         uv run check-wheel-contents dist/*.whl
 
-    - name: Store distribution packages
+    - name: Upload build artifacts
       uses: actions/upload-artifact@v4
       with:
         name: python-package-distributions
         path: dist/
+        retention-days: 7
 
-  publish-pypi:
-    name: Publish to PyPI
-    needs: build
+  publish-to-testpypi:
+    name: Publish to TestPyPI
+    needs: [build-and-validate]
     runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    environment:
+      name: test-pypi
+      url: https://test.pypi.org/p/stardeck
+    permissions:
+      id-token: write
+
+    steps:
+    - name: Download package distributions
+      uses: actions/download-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+
+    - name: Publish to TestPyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        repository-url: https://test.pypi.org/legacy/
+        print-hash: true
+
+  publish-to-pypi:
+    name: Publish to PyPI
+    needs: [build-and-validate]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     environment:
       name: pypi
       url: https://pypi.org/p/stardeck
     permissions:
       id-token: write
+      contents: write
+
     steps:
-    - name: Download distributions
+    - name: Download package distributions
       uses: actions/download-artifact@v4
       with:
         name: python-package-distributions
         path: dist/
+
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        print-hash: true
 
-  github-release:
+  create-github-release:
     name: Create GitHub Release
-    needs: publish-pypi
+    needs: [publish-to-pypi]
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     permissions:
       contents: write
+
     steps:
     - uses: actions/checkout@v4
-    - name: Download distributions
+      with:
+        fetch-depth: 0
+
+    - name: Download package distributions
       uses: actions/download-artifact@v4
       with:
         name: python-package-distributions
         path: dist/
-    - name: Detect pre-release
-      id: prerelease
+
+    - name: Determine release type
+      id: release-type
       run: |
-        TAG="${GITHUB_REF#refs/tags/}"
-        if [[ "$TAG" == *"a"* ]] || [[ "$TAG" == *"b"* ]] || [[ "$TAG" == *"rc"* ]] || [[ "$TAG" == *"dev"* ]]; then
-          echo "is_prerelease=true" >> $GITHUB_OUTPUT
+        if [[ ${{ github.ref_name }} =~ -alpha|-beta|-rc ]]; then
+          echo "prerelease=true" >> $GITHUB_OUTPUT
+          echo "Pre-release detected: ${{ github.ref_name }}"
         else
-          echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          echo "prerelease=false" >> $GITHUB_OUTPUT
+          echo "Stable release detected: ${{ github.ref_name }}"
         fi
+
     - name: Create GitHub Release
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
       run: |
-        gh release create "$GITHUB_REF_NAME" dist/* \
-          --repo "$GITHUB_REPOSITORY" \
+        gh release create ${{ github.ref_name }} \
+          --title "StarDeck ${{ github.ref_name }}" \
           --generate-notes \
-          ${{ steps.prerelease.outputs.is_prerelease == 'true' && '--prerelease' || '' }}
+          ${{ steps.release-type.outputs.prerelease == 'true' && '--prerelease' || '--latest' }} \
+          dist/*
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
