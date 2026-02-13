@@ -119,7 +119,7 @@ def test_keyboard_navigation_with_clicks(client: TestClient):
     html = response.text
     # Navigation logic should compare clicks to max_clicks
     # This indicates click-aware navigation is implemented
-    assert "$clicks < $max_clicks" in html or "clicks < max_clicks" in html
+    assert "$clicks<$max_clicks" in html or "$clicks < $max_clicks" in html
 
 
 def test_next_slide_resets_clicks(client: TestClient):

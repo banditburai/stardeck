@@ -1,4 +1,4 @@
-"""Tests for stardeck drawing data models."""
+"""Tests for stardeck drawing system (star-drawing web component integration)."""
 
 import pytest
 from pathlib import Path
@@ -31,396 +31,122 @@ def presenter_token(app_with_state):
     return deck_state["presenter_token"]
 
 
-def test_drawing_layer_in_slide_viewport(client):
-    """Drawing layer SVG should be present in the slide viewport."""
+def test_audience_has_drawing_canvas(client):
+    """Audience view should contain a readonly drawing-canvas component."""
     response = client.get("/")
     assert response.status_code == 200
-    assert "drawing-layer" in response.text
-    assert "<svg" in response.text
+    assert "audience-canvas" in response.text
+    assert "drawing-canvas" in response.text
 
 
-def test_drawing_layer_has_arrow_marker(client):
-    """Drawing layer SVG should include arrow marker definition for arrows."""
+def test_drawing_canvas_is_readonly(client):
+    """Audience canvas should have readonly attribute."""
     response = client.get("/")
     assert response.status_code == 200
-    assert '<marker id="arrow"' in response.text
-    assert "markerwidth" in response.text.lower()  # Attributes are lowercased
+    assert "readonly" in response.text
 
 
-def test_drawing_element_creation():
-    """Point and PenElement should be creatable with required fields."""
-    from stardeck.drawing import PenElement, Point
+def test_drawing_store_apply_and_snapshot():
+    """DrawingStore should apply changes and return snapshots."""
+    from stardeck.drawing_relay import DrawingStore
 
-    point = Point(x=10.0, y=20.0, pressure=0.5)
-    assert point.x == 10.0
-    assert point.y == 20.0
-    assert point.pressure == 0.5
+    store = DrawingStore()
+    changes = [
+        {"type": "create", "element": {"id": "el-1", "kind": "pen", "points": []}},
+        {"type": "create", "element": {"id": "el-2", "kind": "rect", "x": 10}},
+    ]
+    store.apply_changes(0, changes)
 
-    element = PenElement(
-        id="el-1",
-        type="pen",
-        stroke_color="#ff0000",
-        stroke_width=2,
-        points=[point],
-        slide_index=0,
-    )
-    assert element.type == "pen"
-    assert len(element.points) == 1
-    assert element.id == "el-1"
-    assert element.stroke_color == "#ff0000"
-    assert element.stroke_width == 2
-    assert element.slide_index == 0
+    snapshot = store.get_snapshot(0)
+    assert len(snapshot) == 3  # 2 creates + 1 reorder
+    element_ids = [c["element"]["id"] for c in snapshot if c["type"] == "create"]
+    assert "el-1" in element_ids
+    assert "el-2" in element_ids
 
 
-def test_point_pressure_defaults():
-    """Point pressure should default to 1.0."""
-    from stardeck.drawing import Point
+def test_drawing_store_delete():
+    """DrawingStore should handle delete changes."""
+    from stardeck.drawing_relay import DrawingStore
 
-    point = Point(x=50.0, y=50.0)
-    assert point.pressure == 1.0
+    store = DrawingStore()
+    store.apply_changes(0, [
+        {"type": "create", "element": {"id": "el-1", "kind": "pen"}},
+        {"type": "create", "element": {"id": "el-2", "kind": "rect"}},
+    ])
+    store.apply_changes(0, [{"type": "delete", "elementId": "el-1"}])
 
-
-def test_line_element_creation():
-    """LineElement should support start and end arrows."""
-    from stardeck.drawing import LineElement, Point
-
-    element = LineElement(
-        id="line-1",
-        type="line",
-        stroke_color="#0000ff",
-        stroke_width=2,
-        points=[Point(10, 10), Point(90, 90)],
-        start_arrow=False,
-        end_arrow=True,
-        slide_index=0,
-    )
-    assert element.type == "line"
-    assert len(element.points) == 2
-    assert element.start_arrow is False
-    assert element.end_arrow is True
+    snapshot = store.get_snapshot(0)
+    element_ids = [c["element"]["id"] for c in snapshot if c["type"] == "create"]
+    assert element_ids == ["el-2"]
 
 
-def test_shape_element_creation():
-    """ShapeElement should store x, y, width, height."""
-    from stardeck.drawing import ShapeElement
+def test_drawing_store_update():
+    """DrawingStore should handle update changes."""
+    from stardeck.drawing_relay import DrawingStore
 
-    element = ShapeElement(
-        id="rect-1",
-        type="rect",
-        x=10.0,
-        y=20.0,
-        width=50.0,
-        height=30.0,
-        stroke_color="#00ff00",
-        stroke_width=2,
-        fill_color=None,
-        slide_index=0,
-    )
-    assert element.type == "rect"
-    assert element.x == 10.0
-    assert element.y == 20.0
-    assert element.width == 50.0
-    assert element.height == 30.0
-    assert element.fill_color is None
+    store = DrawingStore()
+    store.apply_changes(0, [
+        {"type": "create", "element": {"id": "el-1", "color": "red"}},
+    ])
+    store.apply_changes(0, [
+        {"type": "update", "element": {"id": "el-1", "color": "blue"}},
+    ])
+
+    snapshot = store.get_snapshot(0)
+    elements = [c["element"] for c in snapshot if c["type"] == "create"]
+    assert elements[0]["color"] == "blue"
 
 
-def test_text_element_creation():
-    """TextElement should store text content and styling."""
-    from stardeck.drawing import TextElement
+def test_drawing_store_multiple_slides():
+    """DrawingStore should keep elements separated by slide."""
+    from stardeck.drawing_relay import DrawingStore
 
-    element = TextElement(
-        id="text-1",
-        type="text",
-        x=50.0,
-        y=50.0,
-        text="Hello World",
-        font_size=16,
-        font_family="sans-serif",
-        stroke_color="#000000",
-        slide_index=0,
-    )
-    assert element.text == "Hello World"
-    assert element.font_size == 16
-    assert element.font_family == "sans-serif"
+    store = DrawingStore()
+    store.apply_changes(0, [{"type": "create", "element": {"id": "el-1"}}])
+    store.apply_changes(1, [{"type": "create", "element": {"id": "el-2"}}])
+
+    snap0 = store.get_snapshot(0)
+    snap1 = store.get_snapshot(1)
+    assert any(c["element"]["id"] == "el-1" for c in snap0 if c["type"] == "create")
+    assert any(c["element"]["id"] == "el-2" for c in snap1 if c["type"] == "create")
 
 
-def test_drawing_state_add_element():
-    """DrawingState should track elements by slide index."""
-    from stardeck.drawing import DrawingState, PenElement, Point
+def test_drawing_store_reorder():
+    """DrawingStore should reorder elements and filter out deleted IDs."""
+    from stardeck.drawing_relay import DrawingStore
 
-    state = DrawingState()
-    element = PenElement(
-        id="el-1",
-        type="pen",
-        stroke_color="#f00",
-        stroke_width=2,
-        points=[Point(0, 0)],
-        slide_index=0,
-    )
-    state.add_element(element)
+    store = DrawingStore()
+    store.apply_changes(0, [
+        {"type": "create", "element": {"id": "a"}},
+        {"type": "create", "element": {"id": "b"}},
+        {"type": "create", "element": {"id": "c"}},
+    ])
+    store.apply_changes(0, [{"type": "reorder", "order": ["c", "a", "b"]}])
 
-    assert len(state.elements[0]) == 1
-    assert state.elements[0][0].id == "el-1"
+    snapshot = store.get_snapshot(0)
+    reorder = [c for c in snapshot if c["type"] == "reorder"][0]
+    assert reorder["order"] == ["c", "a", "b"]
 
-
-def test_drawing_state_multiple_slides():
-    """DrawingState should keep elements separated by slide."""
-    from stardeck.drawing import DrawingState, PenElement, Point
-
-    state = DrawingState()
-    el1 = PenElement(
-        id="el-1", type="pen", stroke_color="#f00",
-        stroke_width=2, points=[Point(0, 0)], slide_index=0
-    )
-    el2 = PenElement(
-        id="el-2", type="pen", stroke_color="#0f0",
-        stroke_width=2, points=[Point(10, 10)], slide_index=1
-    )
-    state.add_element(el1)
-    state.add_element(el2)
-
-    assert len(state.elements[0]) == 1
-    assert len(state.elements[1]) == 1
-    assert state.elements[0][0].id == "el-1"
-    assert state.elements[1][0].id == "el-2"
+    # Unknown IDs in reorder are filtered out
+    store.apply_changes(0, [{"type": "reorder", "order": ["b", "unknown", "a", "c"]}])
+    snapshot = store.get_snapshot(0)
+    reorder = [c for c in snapshot if c["type"] == "reorder"][0]
+    assert reorder["order"] == ["b", "a", "c"]
 
 
-def test_drawing_state_undo():
-    """DrawingState should support undo operation."""
-    from stardeck.drawing import DrawingState, PenElement, Point
+def test_drawing_store_empty_snapshot():
+    """DrawingStore should return empty list for slides with no drawings."""
+    from stardeck.drawing_relay import DrawingStore
 
-    state = DrawingState()
-    el1 = PenElement(
-        id="el-1", type="pen", stroke_color="#f00",
-        stroke_width=2, points=[Point(0, 0)], slide_index=0
-    )
-    el2 = PenElement(
-        id="el-2", type="pen", stroke_color="#0f0",
-        stroke_width=2, points=[Point(10, 10)], slide_index=0
-    )
-    state.add_element(el1)
-    state.add_element(el2)
-
-    # Undo should remove last element
-    state.undo()
-    assert len(state.elements[0]) == 1
-    assert state.elements[0][0].id == "el-1"
-    assert len(state.redo_stack) == 1
+    store = DrawingStore()
+    assert store.get_snapshot(0) == []
+    assert store.get_snapshot(999) == []
 
 
-def test_drawing_state_redo():
-    """DrawingState should support redo operation."""
-    from stardeck.drawing import DrawingState, PenElement, Point
-
-    state = DrawingState()
-    el1 = PenElement(
-        id="el-1", type="pen", stroke_color="#f00",
-        stroke_width=2, points=[Point(0, 0)], slide_index=0
-    )
-    el2 = PenElement(
-        id="el-2", type="pen", stroke_color="#0f0",
-        stroke_width=2, points=[Point(10, 10)], slide_index=0
-    )
-    state.add_element(el1)
-    state.add_element(el2)
-    state.undo()
-
-    # Redo should restore the element
-    state.redo()
-    assert len(state.elements[0]) == 2
-    assert state.elements[0][1].id == "el-2"
-    assert len(state.redo_stack) == 0
-
-
-def test_drawing_state_clear_slide():
-    """DrawingState should support clearing all elements on a slide."""
-    from stardeck.drawing import DrawingState, PenElement, Point
-
-    state = DrawingState()
-    el1 = PenElement(
-        id="el-1", type="pen", stroke_color="#f00",
-        stroke_width=2, points=[Point(0, 0)], slide_index=0
-    )
-    el2 = PenElement(
-        id="el-2", type="pen", stroke_color="#0f0",
-        stroke_width=2, points=[Point(10, 10)], slide_index=0
-    )
-    el3 = PenElement(
-        id="el-3", type="pen", stroke_color="#00f",
-        stroke_width=2, points=[Point(20, 20)], slide_index=1
-    )
-    state.add_element(el1)
-    state.add_element(el2)
-    state.add_element(el3)
-
-    # Clear slide 0
-    state.clear_slide(0)
-
-    assert len(state.elements.get(0, [])) == 0
-    assert len(state.elements.get(1, [])) == 1  # Slide 1 unaffected
-    assert state.elements[1][0].id == "el-3"
-
-
-def test_drawing_state_undo_clear():
-    """Undo of clear_slide should restore all cleared elements."""
-    from stardeck.drawing import DrawingState, PenElement, Point
-
-    state = DrawingState()
-    el1 = PenElement(
-        id="el-1", type="pen", stroke_color="#f00",
-        stroke_width=2, points=[Point(0, 0)], slide_index=0
-    )
-    el2 = PenElement(
-        id="el-2", type="pen", stroke_color="#0f0",
-        stroke_width=2, points=[Point(10, 10)], slide_index=0
-    )
-    state.add_element(el1)
-    state.add_element(el2)
-
-    # Clear the slide
-    state.clear_slide(0)
-    assert len(state.elements.get(0, [])) == 0
-
-    # Undo should restore both elements
-    state.undo()
-    assert len(state.elements[0]) == 2
-    assert state.elements[0][0].id == "el-1"
-    assert state.elements[0][1].id == "el-2"
-
-
-def test_drawing_state_redo_clear():
-    """Redo of undone clear should re-clear the slide."""
-    from stardeck.drawing import DrawingState, PenElement, Point
-
-    state = DrawingState()
-    el1 = PenElement(
-        id="el-1", type="pen", stroke_color="#f00",
-        stroke_width=2, points=[Point(0, 0)], slide_index=0
-    )
-    state.add_element(el1)
-    state.clear_slide(0)
-    state.undo()
-
-    # Redo should clear again
-    state.redo()
-    assert len(state.elements.get(0, [])) == 0
-
-
-def test_pen_element_to_svg_path():
-    """PenElement should convert to SVG path string."""
-    from stardeck.drawing import PenElement, Point, element_to_svg
-
-    element = PenElement(
-        id="pen-1",
-        type="pen",
-        stroke_color="#ff0000",
-        stroke_width=2,
-        points=[Point(10, 20), Point(30, 40), Point(50, 30)],
-        slide_index=0,
-    )
-    svg = element_to_svg(element)
-    assert "path" in svg
-    assert 'stroke="#ff0000"' in svg
-    assert "M 10" in svg  # Move to start point
-
-
-def test_line_element_to_svg():
-    """LineElement should convert to SVG line element."""
-    from stardeck.drawing import LineElement, Point, element_to_svg
-
-    element = LineElement(
-        id="line-1",
-        type="line",
-        stroke_color="#0000ff",
-        stroke_width=2,
-        points=[Point(10, 10), Point(90, 90)],
-        start_arrow=False,
-        end_arrow=False,
-        slide_index=0,
-    )
-    svg = element_to_svg(element)
-    assert "<line" in svg
-    assert 'x1="10"' in svg
-    assert 'y1="10"' in svg
-    assert 'x2="90"' in svg
-    assert 'y2="90"' in svg
-    assert 'stroke="#0000ff"' in svg
-
-
-def test_rect_element_to_svg():
-    """ShapeElement with type rect should convert to SVG rect element."""
-    from stardeck.drawing import ShapeElement, element_to_svg
-
-    element = ShapeElement(
-        id="rect-1",
-        type="rect",
-        x=10,
-        y=10,
-        width=50,
-        height=30,
-        stroke_color="#00ff00",
-        stroke_width=2,
-        fill_color=None,
-        slide_index=0,
-    )
-    svg = element_to_svg(element)
-    assert "<rect" in svg
-    assert 'x="10"' in svg
-    assert 'y="10"' in svg
-    assert 'width="50"' in svg
-    assert 'height="30"' in svg
-    assert 'stroke="#00ff00"' in svg
-    assert 'fill="none"' in svg
-
-
-def test_ellipse_element_to_svg():
-    """ShapeElement with type ellipse should convert to SVG ellipse element."""
-    from stardeck.drawing import ShapeElement, element_to_svg
-
-    element = ShapeElement(
-        id="ellipse-1",
-        type="ellipse",
-        x=50,
-        y=50,
-        width=40,
-        height=20,
-        stroke_color="#ff00ff",
-        stroke_width=2,
-        fill_color=None,
-        slide_index=0,
-    )
-    svg = element_to_svg(element)
-    assert "<ellipse" in svg
-    assert 'cx="70.0"' in svg  # x + width/2
-    assert 'cy="60.0"' in svg  # y + height/2
-    assert 'rx="20.0"' in svg  # width/2
-    assert 'ry="10.0"' in svg  # height/2
-    assert 'stroke="#ff00ff"' in svg
-
-
-def test_arrow_element_to_svg():
-    """LineElement with end_arrow=True should include marker-end attribute."""
-    from stardeck.drawing import LineElement, Point, element_to_svg
-
-    element = LineElement(
-        id="arrow-1",
-        type="arrow",
-        stroke_color="#000000",
-        stroke_width=2,
-        points=[Point(10, 50), Point(90, 50)],
-        start_arrow=False,
-        end_arrow=True,
-        slide_index=0,
-    )
-    svg = element_to_svg(element)
-    assert "<line" in svg
-    assert "marker-end" in svg  # Arrow marker reference
-
-
-def test_presentation_state_has_drawing(tmp_path: Path):
-    """PresentationState should include DrawingState for annotations."""
+def test_presentation_state_has_drawing_store(tmp_path: Path):
+    """PresentationState should include DrawingStore."""
     from stardeck.server import create_app
-    from stardeck.drawing import DrawingState
+    from stardeck.drawing_relay import DrawingStore
 
     md_file = tmp_path / "slides.md"
     md_file.write_text("# Slide 1")
@@ -429,45 +155,61 @@ def test_presentation_state_has_drawing(tmp_path: Path):
     pres = deck_state["presentation"]
 
     assert hasattr(pres, "drawing")
-    assert isinstance(pres.drawing, DrawingState)
+    assert isinstance(pres.drawing, DrawingStore)
 
 
-def test_presenter_draw_endpoint(client: TestClient, presenter_token: str):
-    """Presenter should be able to add drawing elements via POST."""
-    element_data = {
-        "id": "el-1",
-        "type": "pen",
-        "stroke_color": "#ff0000",
-        "stroke_width": 2,
-        "points": [{"x": 10, "y": 20}],
-        "slide_index": 0,
-    }
+def test_presenter_changes_endpoint(client: TestClient, presenter_token: str):
+    """Presenter should be able to send drawing changes via POST."""
     response = client.post(
-        f"/api/presenter/draw?token={presenter_token}",
-        json=element_data
+        f"/api/presenter/changes?token={presenter_token}",
+        json={
+            "changes": [
+                {"type": "create", "element": {"id": "el-1", "kind": "pen"}},
+            ],
+            "slide_index": 0,
+        },
     )
     assert response.status_code == 200
+    data = response.json()
+    assert data["ok"] is True
+    assert data["applied"] == 1
 
 
-def test_drawing_element_to_dict():
-    """Drawing elements should be serializable to dict for SSE broadcast."""
-    from stardeck.drawing import PenElement, Point, element_to_dict
-
-    element = PenElement(
-        id="pen-1",
-        type="pen",
-        stroke_color="#ff0000",
-        stroke_width=2,
-        points=[Point(10, 20, 0.5), Point(30, 40)],
-        slide_index=0,
+def test_presenter_changes_requires_token(client: TestClient):
+    """Changes endpoint should reject requests without valid token."""
+    response = client.post(
+        "/api/presenter/changes?token=bad-token",
+        json={"changes": [{"type": "create", "element": {"id": "x"}}]},
     )
-    d = element_to_dict(element)
+    assert response.status_code == 401
 
-    assert d["id"] == "pen-1"
-    assert d["type"] == "pen"
-    assert d["stroke_color"] == "#ff0000"
-    assert d["slide_index"] == 0
-    assert len(d["points"]) == 2
-    assert d["points"][0]["x"] == 10
-    assert d["points"][0]["pressure"] == 0.5
-    assert d["points"][1]["pressure"] == 1.0  # default
+
+def test_presenter_changes_empty(client: TestClient, presenter_token: str):
+    """Empty changes list should return ok with 0 applied."""
+    response = client.post(
+        f"/api/presenter/changes?token={presenter_token}",
+        json={"changes": []},
+    )
+    assert response.status_code == 200
+    assert response.json()["applied"] == 0
+
+
+def test_presenter_has_drawing_canvas(client: TestClient, presenter_token: str):
+    """Presenter view should contain a drawing-canvas component."""
+    response = client.get(f"/presenter?token={presenter_token}")
+    assert response.status_code == 200
+    assert "drawing-canvas" in response.text
+
+
+def test_presenter_has_drawing_toolbar(client: TestClient, presenter_token: str):
+    """Presenter view should contain the star-drawing toolbar."""
+    response = client.get(f"/presenter?token={presenter_token}")
+    assert response.status_code == 200
+    assert "toolbar-island" in response.text or "toolbar-bar" in response.text
+
+
+def test_presenter_wires_element_change(client: TestClient, presenter_token: str):
+    """Presenter should wire element-change events to the changes endpoint."""
+    response = client.get(f"/presenter?token={presenter_token}")
+    html = response.text
+    assert "/api/presenter/changes" in html

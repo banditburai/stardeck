@@ -9,43 +9,58 @@ from pathlib import Path
 from starhtml import (
     Button,
     Div,
+    Link,
+    Relay,
     Script,
+    ScriptEvent,
     Signal,
+    SignalEvent,
     Span,
     Style,
-    Svg,
     elements,
+    execute_script,
+    format_event,
     get,
+    iconify_script,
     signals,
     sse,
     star_app,
 )
-from fastcore.xml import ft, to_xml
+from starhtml.plugins import resize
+from starhtml.datastar import js
+from starhtml.realtime import SSE_HEADERS
+from star_drawing import DrawingCanvas
 from starlette.responses import JSONResponse, StreamingResponse
 
-from stardeck.drawing import DrawingElement, DrawingState, element_to_dict, parse_element
+from stardeck.drawing_relay import DrawingStore
 from stardeck.parser import parse_deck
 from stardeck.presenter import create_presenter_view
 from stardeck.renderer import render_slide
 from stardeck.themes import get_theme_css
 
+_AUDIENCE_CANVAS = "#audience-canvas"
+
+
+def _audience_drawing_script(snapshot: list[dict], *, clear: bool = True) -> str:
+    """JS to load a drawing snapshot onto the audience canvas."""
+    snapshot_json = json.dumps(snapshot) if snapshot else "[]"
+    clear_call = "c.clear();" if clear else ""
+    return (
+        f"(()=>{{const c=document.querySelector('{_AUDIENCE_CANVAS}');"
+        f"if(!c||!c.applyRemoteChanges)return;"
+        f"{clear_call}c.applyRemoteChanges({snapshot_json})}})()"
+    )
+
 
 class PresentationState:
-    """Server-side presentation state with pub/sub for broadcast sync.
-
-    This enables true presenter→audience sync:
-    - Presenter controls update the authoritative state
-    - All connected audience clients receive broadcasts
-    - One-way sync: presenter controls, audience follows
-    """
+    """Server-side presentation state with Relay-based presenter→audience broadcast."""
 
     def __init__(self, deck):
         self.deck = deck
         self.slide_index = 0
         self.clicks = 0
-        self.subscribers: list[asyncio.Queue] = []
-        self._lock = asyncio.Lock()
-        self.drawing = DrawingState()
+        self.relay = Relay()
+        self.drawing = DrawingStore()
 
     @property
     def current_slide(self):
@@ -61,182 +76,151 @@ class PresentationState:
     def max_clicks(self):
         return self.current_slide.max_clicks
 
-    async def subscribe(self) -> asyncio.Queue:
-        """Subscribe to state changes. Returns a queue that receives updates."""
-        queue = asyncio.Queue()
-        async with self._lock:
-            self.subscribers.append(queue)
-        return queue
+    def broadcast(self):
+        self.relay.emit_signals({
+            "slide_index": self.slide_index,
+            "clicks": self.clicks,
+            "max_clicks": self.max_clicks,
+        })
+        self.relay.emit_element(render_slide(self.current_slide, self.deck), "#slide-content")
+        snapshot = self.drawing.get_snapshot(self.slide_index)
+        self.relay.emit_script(_audience_drawing_script(snapshot))
 
-    async def unsubscribe(self, queue: asyncio.Queue):
-        """Unsubscribe from state changes."""
-        async with self._lock:
-            if queue in self.subscribers:
-                self.subscribers.remove(queue)
-
-    async def broadcast(self):
-        """Broadcast current state to all subscribers."""
-        async with self._lock:
-            for queue in self.subscribers:
-                try:
-                    # Non-blocking put - drop if queue is full
-                    queue.put_nowait({
-                        "slide_index": self.slide_index,
-                        "clicks": self.clicks,
-                        "max_clicks": self.max_clicks,
-                    })
-                except asyncio.QueueFull:
-                    pass  # Skip slow clients
-
-    async def goto_slide(self, idx: int, clicks: int = 0):
-        """Navigate to a specific slide and broadcast to all clients."""
+    def goto_slide(self, idx: int, clicks: int = 0):
         idx = max(0, min(idx, self.deck.total - 1))
         slide = self.deck.slides[idx]
         clicks = max(0, min(clicks, slide.max_clicks))
-
         self.slide_index = idx
         self.clicks = clicks
-        await self.broadcast()
+        self.broadcast()
 
-    async def next(self):
-        """Go to next click or next slide."""
+    def next(self):
         if self.clicks < self.max_clicks:
             self.clicks += 1
         else:
             self.slide_index = min(self.slide_index + 1, self.deck.total - 1)
             self.clicks = 0
-        await self.broadcast()
+        self.broadcast()
 
-    async def prev(self):
-        """Go to previous click or previous slide."""
+    def prev(self):
         if self.clicks > 0:
             self.clicks -= 1
         else:
             self.slide_index = max(self.slide_index - 1, 0)
-            # Go to last click of previous slide
             self.clicks = self.current_slide.max_clicks
-        await self.broadcast()
+        self.broadcast()
 
     def reload_deck(self, new_deck):
-        """Reload deck after file change."""
         self.deck = new_deck
-        # Clamp current position to valid range
         self.slide_index = min(self.slide_index, new_deck.total - 1)
         self.clicks = min(self.clicks, self.current_slide.max_clicks)
 
-    async def add_drawing(self, element: DrawingElement):
-        """Add a drawing element and broadcast to all subscribers."""
-        self.drawing.add_element(element)
-        await self.broadcast_drawing(element)
-
-    async def broadcast_drawing(self, element: DrawingElement):
-        """Broadcast a drawing element to all subscribers."""
-        async with self._lock:
-            for queue in self.subscribers:
-                try:
-                    queue.put_nowait({
-                        "type": "drawing",
-                        "action": "add",
-                        "element": element_to_dict(element),
-                    })
-                except asyncio.QueueFull:
-                    pass
+    def apply_and_broadcast_changes(self, slide_index: int, changes: list[dict]):
+        self.drawing.apply_changes(slide_index, changes)
+        changes_json = json.dumps(changes)
+        self.relay.emit_script(
+            f"(()=>{{const c=document.querySelector('{_AUDIENCE_CANVAS}');"
+            f"if(c&&c.applyRemoteChanges)c.applyRemoteChanges({changes_json})}})()"
+        )
 
 
 def yield_audience_updates(deck, slide_idx: int, clicks: int = 0):
-    """Yield SSE updates for audience view only."""
     current_slide = deck.slides[slide_idx]
-
-    # Signal updates
     yield signals(slide_index=slide_idx, clicks=clicks, max_clicks=current_slide.max_clicks)
-
-    # Audience view update
     yield elements(render_slide(current_slide, deck), "#slide-content", "inner")
 
 
-def yield_presenter_updates(deck, slide_idx: int, clicks: int = 0):
-    """Yield SSE updates for presenter view only."""
+def yield_presenter_updates(deck, slide_idx: int, clicks: int = 0, *, drawing_snapshot: list[dict] | None = None):
     current_slide = deck.slides[slide_idx]
     next_slide = deck.slides[slide_idx + 1] if slide_idx + 1 < deck.total else None
 
-    # Signal updates
     yield signals(slide_index=slide_idx, clicks=clicks, max_clicks=current_slide.max_clicks)
-
-    # Presenter view updates only
-    yield elements(render_slide(current_slide, deck), "#presenter-current", "inner")
+    yield elements(render_slide(current_slide, deck), "#presenter-slide-content", "inner")
     yield elements(
         render_slide(next_slide, deck) if next_slide else Div("End of presentation"),
-        "#presenter-next",
-        "inner"
+        "#presenter-next", "inner",
     )
     yield elements(
         Div(current_slide.note or "No notes for this slide.", cls="presenter-notes-text"),
-        "#presenter-notes-content",
-        "inner"
+        "#presenter-notes-content", "inner",
     )
 
+    if drawing_snapshot is not None:
+        snapshot_json = json.dumps(drawing_snapshot) if drawing_snapshot else "[]"
+        yield execute_script(
+            f"(()=>{{const c=document.querySelector('drawing-canvas');"
+            f"if(c){{c.clear();c.applyRemoteChanges({snapshot_json})}}}})()"
+        )
 
-def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default", watch: bool = False):
-    """Create a StarDeck application.
 
-    Args:
-        deck_path: Path to the markdown file.
-        debug: Enable debug mode.
-        theme: Theme name to use (default: "default").
-        watch: Enable watch mode for hot reload on file changes.
-
-    Returns:
-        Tuple of (app, route_decorator, deck_state).
-    """
-    # Use mutable container so deck can be re-parsed on reload
-    # reload_timestamp is used by watch mode to detect file changes
+def create_app(deck_path: Path, *, theme: str = "default", watch: bool = False):
     initial_deck = parse_deck(deck_path)
-    # Generate secure token for presenter access
     presenter_token = secrets.token_urlsafe(16)
     deck_state = {
         "deck": initial_deck,
         "path": deck_path,
         "watch": watch,
         "reload_timestamp": int(time.time() * 1000),
-        "presentation": PresentationState(initial_deck),  # Server-side state for broadcast sync
-        "presenter_token": presenter_token,  # Token for presenter authentication
+        "presentation": PresentationState(initial_deck),
+        "presenter_token": presenter_token,
     }
     theme_css = get_theme_css(theme)
-
-    deck = deck_state["deck"]  # Initial deck reference
-    pres = deck_state["presentation"]  # Presentation state reference
+    deck = deck_state["deck"]
 
     app, rt = star_app(
         title=deck.config.title,
         hdrs=[
             Script(src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"),
+            iconify_script(),
+            Link(rel="stylesheet", href="https://fonts.googleapis.com/css2?family=Shantell+Sans:wght@400;700&display=swap"),
             Style(theme_css),
         ],
-        live=debug,
+        live=False,
     )
+    app.register(DrawingCanvas)
+    app.register(resize)
+
+    assets_dir = deck_path.parent / "assets"
+    if assets_dir.is_dir():
+        app.register_package_static("deck_assets", str(assets_dir), "/assets")
 
     @rt("/")
     def home():
-        # Get current state from presentation (for broadcast sync)
         pres = deck_state["presentation"]
         initial_slide = pres.current_slide
 
+        slide_index = Signal("slide_index", pres.slide_index)
+        total_slides = Signal("total_slides", deck.total)
+        slide_scale = Signal("slide_scale", 1)
+        grid_open = Signal("grid_open", False)
+
+        grid_cards = []
+        for slide in deck.slides:
+            idx = slide.index
+            grid_cards.append(
+                Div(
+                    Div(
+                        render_slide(slide, deck),
+                        cls="grid-slide-inner",
+                    ),
+                    Span(str(idx + 1), cls="grid-slide-number"),
+                    cls="grid-slide-card",
+                    data_class_current=slide_index == idx,
+                    data_on_click=[grid_open.set(False), get(f"/api/slide/{idx}")],
+                ),
+            )
+
         return Div(
-            (slide_index := Signal("slide_index", pres.slide_index)),
-            (total_slides := Signal("total_slides", deck.total)),
-            (clicks := Signal("clicks", pres.clicks)),
-            (max_clicks := Signal("max_clicks", initial_slide.max_clicks)),
-            # Subscribe to presenter broadcasts (long-lived SSE connection)
-            # This enables true one-way sync: presenter controls, audience follows
+            slide_index,
+            total_slides,
+            Signal("clicks", pres.clicks),
+            Signal("max_clicks", initial_slide.max_clicks),
+            grid_open,
+            # Long-lived SSE for presenter→audience sync
+            Span(data_on_load="@get('/api/events')", style="display:none"),
+            # Deep-link: parse #slide or #slide.click on load
             Span(
-                data_init="@get('/api/events')",
-                style="display: none",
-            ),
-            # URL hash navigation on load - uses Datastar's data-init
-            # Supports #slide or #slide.click format (e.g., #3 or #3.2)
-            # Note: This is for deep linking; once loaded, presenter controls via events
-            Span(
-                data_init="""
+                data_on_load=js("""
                     const hash = window.location.hash;
                     if (hash && hash.length > 1) {
                         const parts = hash.substring(1).split('.');
@@ -246,14 +230,12 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default", 
                             @get('/api/slide/' + (slideNum - 1) + '?clicks=' + clickNum)
                         }
                     }
-                """,
-                style="display: none",
+                """),
+                style="display:none",
             ),
-            # URL hash change listener - handles manual URL changes and back/forward
-            # Supports #slide or #slide.click format (e.g., #3 or #3.2)
             Span(
                 data_on_hashchange=(
-                    """
+                    js("""
                     const hash = window.location.hash;
                     if (hash && hash.length > 1) {
                         const parts = hash.substring(1).split('.');
@@ -263,93 +245,87 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default", 
                             @get('/api/slide/' + (slideNum - 1) + '?clicks=' + clickNum)
                         }
                     }
-                    """,
+                    """),
                     {"window": True},
                 ),
-                style="display: none",
+                style="display:none",
             ),
-            # Slide viewport (full screen)
             Div(
-                render_slide(deck.slides[0], deck),
-                # Drawing layer overlay (SVG for vector annotations)
-                Svg(
-                    # Arrow marker definition for line arrows
-                    ft("defs",
-                        ft("marker",
-                            ft("path", d="M 0 0 L 10 5 L 0 10 z", fill="currentColor"),
-                            id="arrow",
-                            viewBox="0 0 10 10",
-                            refX="9",
-                            refY="5",
-                            markerWidth="6",
-                            markerHeight="6",
-                            orient="auto-start-reverse",
-                        ),
-                    ),
-                    id="drawing-layer",
-                    cls="drawing-layer",
-                    viewBox="0 0 100 100",
-                    preserveAspectRatio="none",
+                slide_scale,
+                Div(
+                    Div(render_slide(deck.slides[0], deck), id="slide-content"),
+                    DrawingCanvas(readonly=True, id="audience-canvas", style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:100;", viewbox_width=160, viewbox_height=90),
+                    cls="slide-scaler",
+                    data_attr_style="transform: translate(-50%, -50%) scale(" + slide_scale + ")",
                 ),
-                id="slide-content",
                 cls="slide-viewport",
+                data_resize=slide_scale.set(
+                    (js("$resize_width") / 1920).min(js("$resize_height") / 1080)
+                ),
             ),
-            # Navigation controls
             Div(
-                Button(
-                    "←",
-                    cls="nav-btn",
-                    data_on_click=get("/api/slide/prev"),
-                    data_attr_disabled=slide_index == 0,
-                ),
-                Span(
-                    data_text=slide_index + 1 + " / " + total_slides,
-                    cls="slide-counter",
-                ),
-                Button(
-                    "→",
-                    cls="nav-btn",
-                    data_on_click=get("/api/slide/next"),
-                    data_attr_disabled=slide_index == total_slides - 1,
-                ),
+                Div(*grid_cards, cls="grid-container"),
+                cls="overview-grid-modal",
+                data_class_active=grid_open,
+                data_on_click=js("if (evt.target === this) $grid_open = false"),
+                data_effect=js("""
+                    if ($grid_open) {
+                        requestAnimationFrame(() => {
+                            const root = document.querySelector('.stardeck-root');
+                            const sw = parseFloat(getComputedStyle(root).getPropertyValue('--slide-width'));
+                            document.querySelectorAll('.grid-slide-card').forEach(card => {
+                                const inner = card.querySelector('.grid-slide-inner');
+                                if (inner) inner.style.transform = 'scale(' + (card.offsetWidth / sw) + ')';
+                            });
+                        });
+                    }
+                """),
+            ),
+            Div(
+                Button("←", cls="nav-btn", data_on_click=get("/api/slide/prev"), data_attr_disabled=slide_index == 0),
+                Button(data_text=slide_index + 1 + " / " + total_slides, cls="slide-counter", data_on_click=grid_open.toggle()),
+                Button("→", cls="nav-btn", data_on_click=get("/api/slide/next"), data_attr_disabled=slide_index == total_slides - 1),
                 cls="navigation-bar",
             ),
-            # Keyboard navigation with click support (window-level)
             Span(
                 data_on_keydown=(
-                    """
-                    if (evt.key === 'ArrowRight' || evt.key === ' ') {
+                    js("""
+                    if (evt.key === 'g' || evt.key === 'o') {
                         evt.preventDefault();
-                        if ($clicks < $max_clicks) {
-                            $clicks++;
-                        } else {
-                            $clicks = 0;
-                            @get('/api/slide/next');
-                        }
-                    } else if (evt.key === 'ArrowLeft') {
-                        evt.preventDefault();
-                        if ($clicks > 0) {
-                            $clicks--;
-                        } else {
-                            @get('/api/slide/prev');
+                        $grid_open = !$grid_open;
+                    } else if (evt.key === 'Escape') {
+                        if ($grid_open) { evt.preventDefault(); $grid_open = false; }
+                    } else if (!$grid_open) {
+                        if (evt.key === 'ArrowRight' || evt.key === ' ') {
+                            evt.preventDefault();
+                            if ($clicks < $max_clicks) {
+                                $clicks++;
+                            } else {
+                                $clicks = 0;
+                                @get('/api/slide/next');
+                            }
+                        } else if (evt.key === 'ArrowLeft') {
+                            evt.preventDefault();
+                            if ($clicks > 0) {
+                                $clicks--;
+                            } else {
+                                @get('/api/slide/prev');
+                            }
                         }
                     }
-                    """,
+                    """),
                     {"window": True},
                 ),
-                style="display: none",
+                style="display:none",
             ),
-            # URL hash update on navigation - uses Datastar effect (DS-005)
-            # Format: #slide or #slide.click (e.g., #3 or #3.2)
             Span(
-                data_effect="window.history.replaceState(null, '', '#' + ($slide_index + 1) + ($clicks > 0 ? '.' + $clicks : ''))",
-                style="display: none",
+                data_effect=js("window.history.replaceState(null, '', '#' + ($slide_index + 1) + ($clicks > 0 ? '.' + $clicks : ''))"),
+                style="display:none",
             ),
-            # Watch mode polling for hot reload (only when watch=True)
             Span(
-                (watch_ts := Signal("watch_ts", deck_state["reload_timestamp"])),
+                Signal("watch_ts", deck_state["reload_timestamp"]),
                 data_on_interval=(
-                    """
+                    js("""
                     fetch('/api/watch-status')
                         .then(r => r.json())
                         .then(data => {
@@ -358,262 +334,132 @@ def create_app(deck_path: Path, *, debug: bool = False, theme: str = "default", 
                                 @get('/api/reload')
                             }
                         })
-                    """,
+                    """),
                     {"duration": "1s"},
                 ),
-                style="display: none",
+                style="display:none",
             ) if deck_state.get("watch") else None,
             cls="stardeck-root",
         )
 
     @rt("/presenter")
     def presenter(token: str = ""):
-        """Presenter view - requires valid token for access."""
         if token != deck_state["presenter_token"]:
             return Div(
-                Div(
-                    "Access Denied",
-                    style="font-size: 2rem; color: #f44; margin-bottom: 1rem;",
-                ),
-                Div(
-                    "Presenter mode requires a valid token.",
-                    style="color: #888;",
-                ),
-                style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #121212; font-family: system-ui;",
+                Div("Access Denied", style="font-size:2rem;color:#f44;margin-bottom:1rem"),
+                Div("Presenter mode requires a valid token.", style="color:#888"),
+                style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#121212;font-family:system-ui",
             )
-        return create_presenter_view(
-            deck_state["deck"], deck_state["presentation"], token=token
-        )
+        return create_presenter_view(deck_state["deck"], deck_state["presentation"], token=token)
 
-    # =========================================================================
-    # Broadcast sync endpoints - True presenter→audience sync
-    # =========================================================================
+    # --- Broadcast sync: presenter→audience via Relay ---
 
     @rt("/api/events")
     async def events():
-        """SSE stream for broadcast sync. Audience clients subscribe here.
-
-        This is a long-lived connection that receives updates whenever
-        the presenter navigates. Enables true one-way sync.
-        """
         pres = deck_state["presentation"]
-        queue = await pres.subscribe()
+        queue = pres.relay.subscribe()
 
         async def event_stream():
             try:
-                deck = pres.deck
+                # Initial state for late-joiners
+                yield format_event(SignalEvent({
+                    "slide_index": pres.slide_index,
+                    "clicks": pres.clicks,
+                    "max_clicks": pres.max_clicks,
+                    "total_slides": pres.deck.total,
+                }))
+                snapshot = pres.drawing.get_snapshot(pres.slide_index)
+                if snapshot:
+                    yield format_event(ScriptEvent(_audience_drawing_script(snapshot, clear=False)))
 
-                # Send initial state immediately (Datastar SSE format)
-                yield f"event: datastar-patch-signals\ndata: signals {{\"slide_index\": {pres.slide_index}, \"clicks\": {pres.clicks}, \"max_clicks\": {pres.max_clicks}, \"total_slides\": {deck.total}}}\n\n"
-
-                # Wait for updates from presenter
                 while True:
                     try:
-                        # Wait for next state change (with timeout to keep connection alive)
-                        state = await asyncio.wait_for(queue.get(), timeout=30.0)
-
-                        # Handle drawing events
-                        if state.get("type") == "drawing":
-                            action = state.get("action", "add")
-                            if action == "add":
-                                event_data = json.dumps({"action": "add", "element": state["element"]})
-                            elif action == "remove":
-                                event_data = json.dumps({
-                                    "action": "remove",
-                                    "element_id": state["element_id"],
-                                    "slide_index": state["slide_index"],
-                                })
-                            else:  # clear
-                                event_data = json.dumps({
-                                    "action": "clear",
-                                    "slide_index": state["slide_index"],
-                                })
-                            yield f"event: datastar-drawing\ndata: {event_data}\n\n"
-                            continue
-
-                        # Send signal updates (Datastar format) for navigation events
-                        yield f"event: datastar-patch-signals\ndata: signals {{\"slide_index\": {state['slide_index']}, \"clicks\": {state['clicks']}, \"max_clicks\": {state['max_clicks']}}}\n\n"
-
-                        # Send element updates for audience view
-                        current = pres.current_slide
-                        slide_html = to_xml(render_slide(current, deck))
-                        # For SSE, multi-line content needs each line prefixed with "data: elements "
-                        lines = slide_html.split("\n")
-                        elements_data = "\n".join(f"data: elements {line}" for line in lines)
-                        yield f"event: datastar-patch-elements\ndata: mode inner\ndata: selector #slide-content\n{elements_data}\n\n"
-
+                        event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                        yield format_event(event)
                     except asyncio.TimeoutError:
-                        # Send keepalive comment
                         yield ": keepalive\n\n"
 
             except asyncio.CancelledError:
                 pass
             finally:
-                await pres.unsubscribe(queue)
+                pres.relay.unsubscribe(queue)
 
         return StreamingResponse(
             event_stream(),
             media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "X-Accel-Buffering": "no",
-            },
+            headers=SSE_HEADERS,
         )
 
     @rt("/api/presenter/next")
     @sse
-    async def presenter_next():
-        """Presenter navigation: next click or slide. Broadcasts to all audience."""
+    def presenter_next():
         pres = deck_state["presentation"]
-        await pres.next()
-        # Return updates for presenter view only (audience gets updates via /api/events)
-        for update in yield_presenter_updates(pres.deck, pres.slide_index, pres.clicks):
-            yield update
+        pres.next()
+        snapshot = pres.drawing.get_snapshot(pres.slide_index)
+        yield from yield_presenter_updates(pres.deck, pres.slide_index, pres.clicks, drawing_snapshot=snapshot)
 
     @rt("/api/presenter/prev")
     @sse
-    async def presenter_prev():
-        """Presenter navigation: previous click or slide. Broadcasts to all audience."""
+    def presenter_prev():
         pres = deck_state["presentation"]
-        await pres.prev()
-        # Return updates for presenter view only (audience gets updates via /api/events)
-        for update in yield_presenter_updates(pres.deck, pres.slide_index, pres.clicks):
-            yield update
+        pres.prev()
+        snapshot = pres.drawing.get_snapshot(pres.slide_index)
+        yield from yield_presenter_updates(pres.deck, pres.slide_index, pres.clicks, drawing_snapshot=snapshot)
 
     @rt("/api/presenter/goto/{idx}")
     @sse
-    async def presenter_goto(idx: int, clicks: int = 0):
-        """Presenter navigation: go to specific slide. Broadcasts to all audience."""
+    def presenter_goto(idx: int, clicks: int = 0):
         pres = deck_state["presentation"]
-        await pres.goto_slide(idx, clicks)
-        # Return updates for presenter view only (audience gets updates via /api/events)
-        for update in yield_presenter_updates(pres.deck, pres.slide_index, pres.clicks):
-            yield update
+        pres.goto_slide(idx, clicks)
+        snapshot = pres.drawing.get_snapshot(pres.slide_index)
+        yield from yield_presenter_updates(pres.deck, pres.slide_index, pres.clicks, drawing_snapshot=snapshot)
 
-    @rt("/api/presenter/draw", methods=["POST"])
-    async def presenter_draw(token: str, request):
-        """Add drawing element and broadcast to audience."""
+    @rt("/api/presenter/changes", methods=["POST"])
+    async def presenter_changes(token: str, request):
         if token != deck_state["presenter_token"]:
             return JSONResponse({"error": "unauthorized"}, status_code=401)
-
         body = await request.json()
+        changes = body.get("changes", [])
+        if not changes:
+            return JSONResponse({"ok": True, "applied": 0})
         pres = deck_state["presentation"]
-        drawing_element = parse_element(body)
-        await pres.add_drawing(drawing_element)
+        slide_index = body.get("slide_index", pres.slide_index)
+        pres.apply_and_broadcast_changes(slide_index, changes)
+        return JSONResponse({"ok": True, "applied": len(changes)})
 
-        # Return confirmation (audience gets update via /api/events)
-        return JSONResponse({"drawing_added": True})
-
-    @rt("/api/presenter/draw/undo", methods=["POST"])
-    async def presenter_draw_undo(token: str):
-        """Undo last drawing action and broadcast to audience."""
-        if token != deck_state["presenter_token"]:
-            return JSONResponse({"error": "unauthorized"}, status_code=401)
-
-        pres = deck_state["presentation"]
-        action = pres.drawing.undo()
-        if action:
-            # Broadcast removal to audience
-            element = action["element"]
-            async with pres._lock:
-                for queue in pres.subscribers:
-                    try:
-                        queue.put_nowait({
-                            "type": "drawing",
-                            "action": "remove",
-                            "element_id": element.id,
-                            "slide_index": element.slide_index,
-                        })
-                    except asyncio.QueueFull:
-                        pass
-            return JSONResponse({"undone": True, "element_id": element.id})
-        return JSONResponse({"undone": False})
-
-    @rt("/api/presenter/draw/redo", methods=["POST"])
-    async def presenter_draw_redo(token: str):
-        """Redo last undone drawing action and broadcast to audience."""
-        if token != deck_state["presenter_token"]:
-            return JSONResponse({"error": "unauthorized"}, status_code=401)
-
-        pres = deck_state["presentation"]
-        action = pres.drawing.redo()
-        if action:
-            # Broadcast addition to audience
-            element = action["element"]
-            await pres.broadcast_drawing(element)
-            return JSONResponse({"redone": True, "element_id": element.id})
-        return JSONResponse({"redone": False})
-
-    @rt("/api/presenter/draw/clear", methods=["POST"])
-    async def presenter_draw_clear(token: str, slide_index: int = 0):
-        """Clear all drawings on a slide and broadcast to audience."""
-        if token != deck_state["presenter_token"]:
-            return JSONResponse({"error": "unauthorized"}, status_code=401)
-
-        pres = deck_state["presentation"]
-        # Use current slide if not specified
-        if slide_index == 0:
-            slide_index = pres.slide_index
-        removed = pres.drawing.clear_slide(slide_index)
-        if removed:
-            # Broadcast clear to audience
-            async with pres._lock:
-                for queue in pres.subscribers:
-                    try:
-                        queue.put_nowait({
-                            "type": "drawing",
-                            "action": "clear",
-                            "slide_index": slide_index,
-                        })
-                    except asyncio.QueueFull:
-                        pass
-            return JSONResponse({"cleared": True, "count": len(removed)})
-        return JSONResponse({"cleared": False, "count": 0})
-
-    # =========================================================================
-    # Local navigation endpoints - For individual client navigation
-    # (does NOT broadcast to other clients)
-    # =========================================================================
+    # --- Local navigation (individual client, no broadcast) ---
 
     @rt("/api/slide/next")
     @sse
     def next_slide(slide_index: int = 0):
         current_deck = deck_state["deck"]
-        new_idx = min(slide_index + 1, current_deck.total - 1)
-        yield from yield_audience_updates(current_deck, new_idx)
+        yield from yield_audience_updates(current_deck, min(slide_index + 1, current_deck.total - 1))
 
     @rt("/api/slide/prev")
     @sse
     def prev_slide(slide_index: int = 0):
         current_deck = deck_state["deck"]
-        new_idx = max(slide_index - 1, 0)
-        yield from yield_audience_updates(current_deck, new_idx)
+        yield from yield_audience_updates(current_deck, max(slide_index - 1, 0))
 
     @rt("/api/slide/{idx}")
     @sse
     def goto_slide(idx: int, clicks: int = 0):
         current_deck = deck_state["deck"]
         idx = max(0, min(idx, current_deck.total - 1))
-        new_slide = current_deck.slides[idx]
-        # Clamp clicks to valid range for this slide
-        clicks = max(0, min(clicks, new_slide.max_clicks))
+        clicks = max(0, min(clicks, current_deck.slides[idx].max_clicks))
         yield from yield_audience_updates(current_deck, idx, clicks)
 
     @rt("/api/reload")
     @sse
     def reload_deck(slide_index: int = 0):
-        """Re-parse deck and re-render current slide after file change."""
         deck_state["deck"] = parse_deck(deck_state["path"])
         current_deck = deck_state["deck"]
         idx = min(slide_index, current_deck.total - 1)
-        # Also update total_slides signal on reload
         yield signals(total_slides=current_deck.total)
         yield from yield_audience_updates(current_deck, idx)
 
     @rt("/api/watch-status")
     def watch_status():
-        """Return current reload timestamp for watch mode polling."""
         return JSONResponse({"timestamp": deck_state.get("reload_timestamp", 0)})
 
     return app, rt, deck_state

@@ -5,7 +5,8 @@ description = "Developer-first presentation tool - Slidev for Python"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "starhtml",
+    "starhtml>=0.5.3",
+    "star-drawing>=0.1.0",
     "markdown-it-py",
     "mdit-py-plugins",
     "pygments",
@@ -34,3 +35,5 @@ pythonpath = ["."]
 
 [tool.uv.sources]
 starhtml = { path = "../starhtml-upstream", editable = true }
+star-drawing = { path = "../star-drawing", editable = true }
+starelements = { path = "../starelements", editable = true }

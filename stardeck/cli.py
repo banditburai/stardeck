@@ -20,15 +20,14 @@ def cli():
 @cli.command()
 @click.argument("slides", type=click.Path(exists=True, path_type=Path))
 @click.option("--port", "-p", default=5001, help="Port to run the server on.")
-@click.option("--debug", "-d", is_flag=True, help="Enable debug mode with live reload.")
 @click.option("--watch", "-w", is_flag=True, help="Watch for file changes and hot reload.")
-def run(slides: Path, port: int, debug: bool, watch: bool):
+def run(slides: Path, port: int, watch: bool):
     """Run a presentation from a markdown SLIDES file."""
     import time
 
     import uvicorn
 
-    app, rt, deck_state = create_app(slides, debug=debug, watch=watch)
+    app, rt, deck_state = create_app(slides, watch=watch)
     deck = deck_state["deck"]
     presenter_token = deck_state["presenter_token"]
 
@@ -58,6 +57,19 @@ def run(slides: Path, port: int, debug: bool, watch: bool):
     # starhtml's serve() expects a module:variable path for uvicorn reload mode,
     # which doesn't work for apps created dynamically.
     uvicorn.run(app, host="localhost", port=port)
+
+
+@cli.command()
+@click.argument("slides", type=click.Path(exists=True, path_type=Path))
+@click.option("--output", "-o", default="dist", type=click.Path(path_type=Path), help="Output directory.")
+@click.option("--theme", "-t", default="default", help="Theme to use.")
+def export(slides: Path, output: Path, theme: str):
+    """Export a presentation as standalone HTML."""
+    from stardeck.export import export_deck
+
+    result = export_deck(slides, output, theme)
+    click.echo(f"Exported to {result}/")
+    click.echo(f"  Open {result / 'index.html'} in a browser to view.")
 
 
 if __name__ == "__main__":

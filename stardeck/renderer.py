@@ -3,46 +3,31 @@
 from pygments import highlight
 from pygments.formatters import HtmlFormatter
 from pygments.lexers import get_lexer_by_name, guess_lexer
-from starhtml import Div, NotStr
+from starhtml import Code, Div, NotStr, Pre
 
 from stardeck.models import Deck, SlideInfo
 
 
 def render_code_block(code: str, language: str = "") -> Div:
-    """Render a code block with syntax highlighting.
-
-    Uses Pygments for highlighting, wraps in StarHTML Div with code-block class.
-    """
-    # Get lexer for the language
+    """Render a code block with syntax highlighting."""
     try:
-        if language:
-            lexer = get_lexer_by_name(language)
-        else:
-            lexer = guess_lexer(code)
+        lexer = get_lexer_by_name(language) if language else guess_lexer(code)
     except Exception:
-        # Fallback to plain text
         from pygments.lexers import TextLexer
 
         lexer = TextLexer()
 
-    # Format with HTML
     formatter = HtmlFormatter(nowrap=True, cssclass="highlight")
     highlighted = highlight(code, lexer, formatter)
 
     return Div(
-        NotStr(f"<pre><code>{highlighted}</code></pre>"),
+        Pre(Code(NotStr(highlighted))),
         cls="code-block",
     )
 
 
 def render_slide(slide: SlideInfo, deck: Deck) -> Div:
-    """Render a slide with layout classes and styling.
-
-    Wraps content in StarHTML Div with slide-{index} and layout-{layout} classes.
-    Applies background if specified in frontmatter.
-    Uses slide.transition if set, otherwise falls back to deck.config.transition.
-    """
-    # Determine transition: slide-specific or deck default
+    """Render a slide as a styled Div."""
     transition = slide.frontmatter.get("transition") or deck.config.transition
 
     classes = [
@@ -52,21 +37,24 @@ def render_slide(slide: SlideInfo, deck: Deck) -> Div:
         "slide",
     ]
 
-    # Build style for background
     style = ""
     if slide.background:
         bg = slide.background
-        if bg.startswith("#") or bg.startswith("rgb"):
-            # Color background
+        if bg.startswith(("#", "rgb")):
             style = f"background-color: {bg};"
         else:
-            # Image background
-            style = f"background-image: url('{bg}'); background-size: cover; background-position: center;"
+            if bg.startswith(("http://", "https://", "/", "data:")):
+                url = bg
+            elif bg.startswith("./"):
+                url = bg[1:]  # "./assets/foo.jpg" -> "/assets/foo.jpg"
+            else:
+                url = f"/{bg}"  # "assets/foo.jpg" -> "/assets/foo.jpg"
+            style = f"background-image: url('{url}'); background-size: cover; background-position: center;"
 
     return Div(
         NotStr(slide.content),
         id=f"slide-{slide.index}",
         cls=" ".join(classes),
         style=style if style else None,
-        **{"data-slide-index": slide.index},
+        data_slide_index=slide.index,
     )
