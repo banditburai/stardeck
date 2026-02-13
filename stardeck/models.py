@@ -1,18 +1,12 @@
 """Data models for StarDeck."""
 
 from dataclasses import dataclass, field
-from pathlib import Path
 
 
 @dataclass(frozen=True)
 class SlideInfo:
-    """Represents a single slide with content and metadata."""
-
     content: str
-    raw: str
     index: int
-    start_line: int
-    end_line: int
     frontmatter: dict = field(default_factory=dict)
     note: str = ""
     title: str = ""
@@ -33,24 +27,45 @@ class SlideInfo:
 
 @dataclass(frozen=True)
 class DeckConfig:
-    """Configuration for the entire slide deck."""
-
     title: str = "Untitled"
-    theme: str = "default"
-    aspect_ratio: str = "16/9"
     transition: str = "fade"
-    code_theme: str = "monokai"
 
 
 @dataclass
 class Deck:
-    """A complete slide deck with slides, config, and metadata."""
-
     slides: list[SlideInfo]
     config: DeckConfig
-    filepath: Path
-    raw: str
 
     @property
     def total(self) -> int:
         return len(self.slides)
+
+
+@dataclass
+class DrawingStore:
+    """Opaque store — server holds drawing JSON as-is without interpretation."""
+
+    _elements: dict[int, dict[str, dict]] = field(default_factory=dict)
+
+    def apply_changes(self, slide_index: int, changes: list[dict]) -> None:
+        elements = self._elements.setdefault(slide_index, {})
+        for change in changes:
+            t = change.get("type")
+            if t in ("create", "update"):
+                el = change["element"]
+                elements[el["id"]] = el
+            elif t == "delete":
+                elements.pop(change["elementId"], None)
+            elif t == "reorder":
+                ordered = {eid: elements[eid] for eid in change["order"] if eid in elements}
+                for eid, el in elements.items():
+                    if eid not in ordered:
+                        ordered[eid] = el
+                self._elements[slide_index] = ordered
+
+    def get_snapshot(self, slide_index: int) -> list[dict]:
+        if not (elements := self._elements.get(slide_index)):
+            return []
+        snapshot = [{"type": "create", "element": el} for el in elements.values()]
+        snapshot.append({"type": "reorder", "order": list(elements.keys())})
+        return snapshot

@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from stardeck.watch import FileWatcher
+from stardeck.server import FileWatcher
 
 
 @pytest.mark.asyncio

@@ -8,16 +8,13 @@ import subprocess
 import threading
 import time
 
-import click
-
 URL_RE = re.compile(r"(https://[\w.-]+\.pinggy\.(?:link|online))")
 STARTUP_TIMEOUT = 15
 
 
 def start_tunnel(port: int, token: str | None = None) -> tuple[subprocess.Popen, str]:
-    """Start a Pinggy SSH tunnel and return (process, public_url)."""
     if not shutil.which("ssh"):
-        raise click.ClickException("SSH not found. Install OpenSSH to use --share.")
+        raise FileNotFoundError("SSH not found. Install OpenSSH to use --share.")
 
     host = "pro.pinggy.io" if token else "a.pinggy.io"
     target = f"{token}@{host}" if token else host
@@ -41,30 +38,27 @@ def start_tunnel(port: int, token: str | None = None) -> tuple[subprocess.Popen,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         stdin=subprocess.DEVNULL,
-        text=True,
         env=env,
     )
+    assert proc.stdout
 
     url = _read_url(proc, STARTUP_TIMEOUT)
     if url is None:
-        output = ""
-        if proc.stdout and proc.stdout.readable():
-            try:
-                output = proc.stdout.read(2000)
-            except Exception:
-                pass
+        try:
+            output = os.read(proc.stdout.fileno(), 2000).decode("utf-8", errors="replace")
+        except Exception:
+            output = ""
         stop_tunnel(proc)
         msg = "Could not establish tunnel (timed out waiting for URL)."
         if output:
             msg += f"\n\nSSH output:\n{output[:500]}"
-        raise click.ClickException(msg)
+        raise RuntimeError(msg)
 
     threading.Thread(target=_drain, args=(proc,), daemon=True).start()
     return proc, url
 
 
 def _read_url(proc: subprocess.Popen, timeout: float) -> str | None:
-    """Poll proc.stdout for a pinggy URL within timeout seconds."""
     deadline = time.monotonic() + timeout
     fd = proc.stdout.fileno()
     buf = ""
@@ -88,20 +82,20 @@ def _read_url(proc: subprocess.Popen, timeout: float) -> str | None:
     return None
 
 
+# Pipe buffer can block SSH if not drained
 def _drain(proc: subprocess.Popen) -> None:
-    """Discard remaining stdout so the pipe buffer doesn't block SSH."""
     try:
-        for _ in proc.stdout:
+        while os.read(proc.stdout.fileno(), 4096):
             pass
-    except Exception:
+    except (OSError, ValueError):
         pass
 
 
 def stop_tunnel(proc: subprocess.Popen) -> None:
-    """Terminate the tunnel process cleanly."""
-    if proc.poll() is not None:
+    try:
+        proc.terminate()
+    except ProcessLookupError:
         return
-    proc.terminate()
     try:
         proc.wait(timeout=5)
     except subprocess.TimeoutExpired:

@@ -1,8 +1,5 @@
-"""Tests for Pinggy SSH tunnel."""
-
 from unittest.mock import MagicMock, patch
 
-import click
 import pytest
 from click.testing import CliRunner
 
@@ -12,7 +9,7 @@ from stardeck.tunnel import start_tunnel, stop_tunnel
 
 def test_start_tunnel_no_ssh():
     with patch("stardeck.tunnel.shutil.which", return_value=None):
-        with pytest.raises(click.ClickException, match="SSH not found"):
+        with pytest.raises(FileNotFoundError, match="SSH not found"):
             start_tunnel(5001)
 
 
@@ -52,7 +49,7 @@ def test_start_tunnel_timeout():
         patch("stardeck.tunnel.select.select", return_value=([], [], [])),
         patch("stardeck.tunnel.STARTUP_TIMEOUT", 0),
     ):
-        with pytest.raises(click.ClickException, match="Could not establish tunnel"):
+        with pytest.raises(RuntimeError, match="Could not establish tunnel"):
             start_tunnel(5001)
 
     mock_proc.terminate.assert_called_once()
@@ -61,8 +58,6 @@ def test_start_tunnel_timeout():
 def test_start_tunnel_ssh_exits_early():
     mock_proc = MagicMock()
     mock_proc.stdout.fileno.return_value = 99
-    mock_proc.stdout.readable.return_value = True
-    mock_proc.stdout.read.return_value = "Permission denied\n"
     mock_proc.poll.side_effect = [None, 1]
 
     with (
@@ -71,7 +66,7 @@ def test_start_tunnel_ssh_exits_early():
         patch("stardeck.tunnel.select.select", return_value=([99], [], [])),
         patch("stardeck.tunnel.os.read", return_value=b""),
     ):
-        with pytest.raises(click.ClickException, match="Could not establish tunnel"):
+        with pytest.raises(RuntimeError, match="Could not establish tunnel"):
             start_tunnel(5001)
 
 
@@ -97,11 +92,12 @@ def test_start_tunnel_uses_pro_host_with_token():
 
 def test_stop_tunnel_already_dead():
     mock_proc = MagicMock()
-    mock_proc.poll.return_value = 0
+    mock_proc.terminate.side_effect = ProcessLookupError
 
     stop_tunnel(mock_proc)
 
-    mock_proc.terminate.assert_not_called()
+    mock_proc.terminate.assert_called_once()
+    mock_proc.wait.assert_not_called()
 
 
 def test_stop_tunnel_terminates():

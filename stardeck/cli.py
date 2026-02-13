@@ -11,41 +11,44 @@ from stardeck.server import create_app
 @click.version_option(package_name="stardeck")
 def cli():
     """StarDeck - Developer-first presentation tool for Python."""
-    pass
 
 
 @cli.command()
 @click.argument("slides", type=click.Path(exists=True, path_type=Path))
 @click.option("--port", "-p", default=5001, help="Port to run the server on.")
+@click.option("--theme", "-t", default="default", help="Theme to use.")
 @click.option("--watch", "-w", is_flag=True, help="Watch for file changes and hot reload.")
 @click.option("--share", is_flag=True, help="Create a public tunnel to share the presentation.")
-@click.option("--share-token", default=None, help="Pinggy token for persistent/custom tunnel URLs.")
-def run(slides: Path, port: int, watch: bool, share: bool, share_token: str):
+@click.option("--share-token", help="Pinggy token for persistent/custom tunnel URLs.")
+def run(slides: Path, port: int, theme: str, watch: bool, share: bool, share_token: str):
     """Run a presentation from a markdown SLIDES file."""
-    import atexit
-
     import uvicorn
 
     if share_token:
         share = True
 
-    tunnel_proc = None
+    tunnel_url = None
     if share:
-        from stardeck.tunnel import start_tunnel
+        import atexit
+
+        from stardeck.tunnel import start_tunnel, stop_tunnel
 
         click.echo("Starting public tunnel...")
-        tunnel_proc, tunnel_url = start_tunnel(port, token=share_token)
+        try:
+            tunnel_proc, tunnel_url = start_tunnel(port, token=share_token)
+        except (FileNotFoundError, RuntimeError) as e:
+            raise click.ClickException(str(e))
+        atexit.register(stop_tunnel, tunnel_proc)
 
-    app, rt, deck_state = create_app(slides, watch=watch)
+    app, _, deck_state = create_app(slides, theme=theme, watch=watch)
     deck = deck_state["deck"]
     presenter_token = deck_state["presenter_token"]
 
-    click.echo(f"Starting StarDeck on http://localhost:{port}")
-    click.echo(f"Slides: {deck.total}")
+    click.echo(f"StarDeck - {deck.total} slides")
     click.echo("")
     click.echo(f"  Audience:  http://localhost:{port}")
     click.echo(f"  Presenter: http://localhost:{port}/presenter?token={presenter_token}")
-    if tunnel_proc:
+    if tunnel_url:
         click.echo("")
         click.echo(f"  Public:    {tunnel_url}")
         if share_token:
@@ -57,14 +60,8 @@ def run(slides: Path, port: int, watch: bool, share: bool, share_token: str):
     if watch:
         click.echo("Watch mode enabled - file changes will trigger hot reload")
 
-    if tunnel_proc:
-        from stardeck.tunnel import stop_tunnel
-
-        atexit.register(stop_tunnel, tunnel_proc)
-
-    # Use uvicorn directly for dynamic apps (created at runtime with slides path).
-    # starhtml's serve() expects a module:variable path for uvicorn reload mode,
-    # which doesn't work for apps created dynamically.
+    # starhtml's serve() needs a module:variable import path for uvicorn reload,
+    # so we call uvicorn directly since the app is created dynamically.
     uvicorn.run(app, host="localhost", port=port)
 
 

@@ -8,100 +8,64 @@ from markdown_it import MarkdownIt
 
 from stardeck.models import Deck, DeckConfig, SlideInfo
 
+_YAML_KEY_RE = re.compile(r"^[\w-]+:\s*")
+_NOTES_RE = re.compile(r"<!--\s*notes\s*\n(.*?)-->", re.DOTALL)
+_REGION_TAGS = ("bottom", "item", "left", "main", "right", "sidebar", "step", "top")
+_REGION_RE = re.compile(
+    r"<(" + "|".join(_REGION_TAGS) + r")(\s[^>]*)?>(.+?)</\1>",
+    re.DOTALL,
+)
+
 
 def _is_slide_delimiter(line: str) -> bool:
-    """Check if line is a slide delimiter (--- at start of line)."""
-    return bool(re.match(r"^---\s*$", line))
+    return line.rstrip() == "---"
 
 
 def _is_yaml_like(text: str) -> bool:
-    """Check if text looks like YAML frontmatter (key: value pairs only)."""
-    lines = [l.strip() for l in text.strip().split("\n") if l.strip()]
-    if not lines:
-        return False
-    # Check if all non-empty lines look like YAML key: value
-    for line in lines:
-        if not re.match(r"^[\w_-]+:\s*.*$", line):
-            return False
-    return True
+    """Lightweight heuristic — avoids YAML parsing at split time."""
+    lines = [ln.strip() for ln in text.strip().split("\n") if ln.strip()]
+    return bool(lines) and all(_YAML_KEY_RE.match(ln) for ln in lines)
 
 
 def _find_frontmatter_end(lines: list[str], start: int) -> int:
-    """Find the closing --- of a frontmatter block.
-
-    Returns the index of the closing ---, or -1 if not found.
-    """
-    for i, line in enumerate(lines[start:], start=start):
-        if _is_slide_delimiter(line):
+    for i in range(start, len(lines)):
+        if _is_slide_delimiter(lines[i]):
             return i
     return -1
 
 
-def split_slides(content: str) -> list[tuple[str, int, int]]:
+def split_slides(content: str) -> list[str]:
     """Split markdown content into slides by --- delimiter.
 
-    Returns list of (content, start_line, end_line) tuples.
-
-    Handles Slidev-style frontmatter for mid-deck slides:
-    ---
-    layout: cover
-    ---
-    # Content
-
-    The above is ONE slide with frontmatter, not two slides.
+    Handles Slidev-style mid-deck frontmatter: a --- / YAML / --- block
+    is attached to the following slide, not treated as a separate delimiter.
     """
     lines = content.split("\n")
-    slides: list[tuple[str, int, int]] = []
-
+    slides: list[str] = []
+    current: list[str] = []
     i = 0
-    current_lines: list[str] = []
-    start_line = 0
 
     while i < len(lines):
         line = lines[i]
 
         if _is_slide_delimiter(line):
-            # Check if this starts a frontmatter block
-            # Look ahead to see if there's YAML followed by another ---
             fm_end = _find_frontmatter_end(lines, i + 1)
+            if fm_end > i + 1 and _is_yaml_like("\n".join(lines[i + 1 : fm_end])):
+                if current or slides:
+                    slides.append("\n".join(current))
+                current = lines[i : fm_end + 1]
+                i = fm_end + 1
+                continue
 
-            if fm_end > i + 1:
-                # There's content between this --- and the next ---
-                potential_yaml = "\n".join(lines[i + 1 : fm_end])
-
-                if _is_yaml_like(potential_yaml):
-                    # This is slide frontmatter, not a separate slide
-                    # Save current slide first
-                    if current_lines or slides:
-                        slide_content = "\n".join(current_lines)
-                        end_line = i - 1 if current_lines else i
-                        slides.append((slide_content, start_line, max(start_line, end_line)))
-
-                    # Start new slide with frontmatter included
-                    current_lines = lines[i : fm_end + 1]  # Include ---, yaml, ---
-                    start_line = i
-                    i = fm_end + 1
-                    continue
-
-            # Regular slide delimiter (no frontmatter follows)
-            if current_lines or slides:
-                slide_content = "\n".join(current_lines)
-                end_line = i - 1 if current_lines else i
-                slides.append((slide_content, start_line, max(start_line, end_line)))
-
-            current_lines = []
-            start_line = i + 1
+            if current or slides:
+                slides.append("\n".join(current))
+            current = []
         else:
-            current_lines.append(line)
-
+            current.append(line)
         i += 1
 
-    # Add final slide
-    if current_lines or not slides:
-        slide_content = "\n".join(current_lines)
-        end_line = len(lines) - 1
-        slides.append((slide_content, start_line, end_line))
-
+    if current or not slides:
+        slides.append("\n".join(current))
     return slides
 
 
@@ -109,13 +73,10 @@ def parse_frontmatter(raw: str) -> tuple[dict, str]:
     """Extract YAML frontmatter from slide content.
 
     Returns (frontmatter_dict, remaining_content).
-    If no frontmatter, returns ({}, original_content).
     """
-    # Check if content starts with ---
     if not raw.startswith("---"):
         return {}, raw
 
-    # Find the closing ---
     lines = raw.split("\n")
     end_idx = None
     for i, line in enumerate(lines[1:], start=1):
@@ -124,77 +85,50 @@ def parse_frontmatter(raw: str) -> tuple[dict, str]:
             break
 
     if end_idx is None:
-        # No closing ---, treat as no frontmatter
         return {}, raw
 
-    # Extract YAML content
     yaml_content = "\n".join(lines[1:end_idx])
     remaining = "\n".join(lines[end_idx + 1 :])
 
-    # Parse YAML
-    if yaml_content.strip():
-        try:
-            frontmatter = yaml.safe_load(yaml_content) or {}
-        except yaml.YAMLError:
-            frontmatter = {}
-    else:
+    try:
+        frontmatter = yaml.safe_load(yaml_content) or {}
+    except yaml.YAMLError:
         frontmatter = {}
 
     return frontmatter, remaining
 
 
-def count_click_tags(content: str) -> int:
-    """Count the number of <click> tags in content."""
-    return len(re.findall(r"<click[^>]*>", content, re.IGNORECASE))
-
-
 def transform_click_tags(content: str) -> tuple[str, int]:
-    """Transform <click>...</click> to click-reveal divs with CSS class toggling.
+    """Transform <click>...</click> to click-reveal divs.
 
     Returns (transformed_content, max_clicks).
     """
-    pattern = r"<click>(.*?)</click>"
-    matches = list(re.finditer(pattern, content, re.DOTALL))
-
+    matches = list(re.finditer(r"<click>(.*?)</click>", content, re.DOTALL))
     if not matches:
         return content, 0
 
-    max_clicks = len(matches)
-    result = content
+    parts = []
+    last_end = 0
+    for i, match in enumerate(matches, 1):
+        parts.append(content[last_end:match.start()])
+        parts.append(
+            f'<div class="click-reveal" data-click="{i}" '
+            f'data-class:revealed="$clicks >= {i}">'
+            f'{match.group(1)}</div>'
+        )
+        last_end = match.end()
+    parts.append(content[last_end:])
 
-    # Replace in reverse to preserve indices
-    for i, match in enumerate(reversed(matches), 1):
-        click_num = max_clicks - i + 1
-        # data-class:revealed toggles "revealed" class for CSS transitions
-        replacement = f'<div class="click-reveal" data-click="{click_num}" data-class:revealed="$clicks >= {click_num}">{match.group(1)}</div>'
-        result = result[: match.start()] + replacement + result[match.end() :]
-
-    return result, max_clicks
-
-
-_REGION_TAGS = {"left", "right", "top", "bottom", "main", "sidebar", "item", "step"}
-_REGION_PATTERN = re.compile(
-    r"<(" + "|".join(_REGION_TAGS) + r")(\s[^>]*)?>(.+?)</\1>",
-    re.DOTALL,
-)
-
-
-def _extract_class_attr(attrs: str) -> str:
-    """Extract class="..." value from an attribute string."""
-    if not attrs:
-        return ""
-    m = re.search(r'class="([^"]*)"', attrs)
-    return m.group(1) if m else ""
+    return "".join(parts), len(matches)
 
 
 def transform_regions(content: str) -> str:
-    """Transform <left>...</left> region tags into div wrappers.
+    """Transform region tags (<left>...</left>) into div wrappers.
 
-    Skips content inside code fences. Extracts class attributes and
-    passes them through to the output div.
+    Skips content inside code fences.
     """
-    # Protect code fences from transformation
     fences: list[str] = []
+
     def _stash_fence(m: re.Match) -> str:
         fences.append(m.group(0))
         return f"\x00FENCE{len(fences) - 1}\x00"
@@ -202,127 +136,84 @@ def transform_regions(content: str) -> str:
     protected = re.sub(r"```.*?```", _stash_fence, content, flags=re.DOTALL)
 
     def _replace_region(m: re.Match) -> str:
-        tag = m.group(1)
-        attrs = m.group(2) or ""
-        inner = m.group(3).strip()
-        extra_class = _extract_class_attr(attrs)
-        cls = f"sd-region {extra_class}".strip() if extra_class else "sd-region"
+        tag, attrs, inner = m.group(1), m.group(2) or "", m.group(3).strip()
+        cls_match = re.search(r'class="([^"]*)"', attrs) if attrs else None
+        extra = cls_match.group(1) if cls_match else ""
+        cls = f"sd-region {extra}".strip() if extra else "sd-region"
         return f'\n<div class="{cls}" data-region="{tag}">\n\n{inner}\n\n</div>\n'
 
-    result = _REGION_PATTERN.sub(_replace_region, protected)
+    result = _REGION_RE.sub(_replace_region, protected)
 
-    # Restore code fences
     for i, fence in enumerate(fences):
         result = result.replace(f"\x00FENCE{i}\x00", fence)
-
     return result
 
 
 def extract_notes(content: str) -> tuple[str, str]:
-    """Extract speaker notes from HTML comments.
-
-    Looks for <!-- notes ... --> blocks and extracts the content.
-    Returns (content_without_notes, notes_text).
-    """
-    # Pattern to match <!-- notes ... --> blocks
-    pattern = r"<!--\s*notes\s*\n(.*?)-->"
-
-    match = re.search(pattern, content, re.DOTALL)
-    if not match:
+    """Extract <!-- notes ... --> blocks. Handles multiple note blocks per slide."""
+    matches = list(_NOTES_RE.finditer(content))
+    if not matches:
         return content, ""
 
-    # Extract notes content
-    notes = match.group(1).strip()
-
-    # Remove the notes block from content
-    result = re.sub(pattern, "", content, flags=re.DOTALL).strip()
-
-    return result, notes
+    notes = "\n\n".join(m.group(1).strip() for m in matches)
+    parts, last = [], 0
+    for m in matches:
+        parts.append(content[last:m.start()])
+        last = m.end()
+    parts.append(content[last:])
+    return "".join(parts).strip(), notes
 
 
 def _create_markdown_renderer() -> MarkdownIt:
-    """Create a MarkdownIt instance with Pygments syntax highlighting."""
     from pygments import highlight
     from pygments.formatters import HtmlFormatter
     from pygments.lexers import get_lexer_by_name
     from pygments.lexers.special import TextLexer
 
     md = MarkdownIt().enable("table")
+    formatter = HtmlFormatter(nowrap=True)
 
-    # Override the fence renderer to use Pygments
     def render_fence(self, tokens, idx, options, env):
         token = tokens[idx]
         code = token.content.rstrip("\n")
         lang = token.info.strip() if token.info else ""
-
         try:
             lexer = get_lexer_by_name(lang) if lang else TextLexer()
         except Exception:
             lexer = TextLexer()
-
-        formatter = HtmlFormatter(nowrap=True)
         highlighted = highlight(code, lexer, formatter)
         return f'<pre><code class="language-{lang}">{highlighted}</code></pre>\n'
 
     md.add_render_rule("fence", render_fence)
 
-    # cls= → class= in raw HTML (Pythonic alias, matching StarHTML convention)
+    # cls= → class= in raw HTML (StarHTML convention)
     def _cls_to_class(self, tokens, idx, options, env):
-        return re.sub(r"\bcls=", "class=", tokens[idx].content)
+        return re.sub(r"(?<=\s)cls=", "class=", tokens[idx].content)
 
     md.add_render_rule("html_block", _cls_to_class)
     md.add_render_rule("html_inline", _cls_to_class)
-
     return md
 
 
 def parse_deck(filepath: Path) -> Deck:
-    """Parse a markdown file into a Deck.
-
-    Combines split_slides, parse_frontmatter, extract_notes,
-    and markdown-it-py rendering.
-    """
     raw_content = filepath.read_text()
     md = _create_markdown_renderer()
 
-    # Split into raw slides
-    raw_slides = split_slides(raw_content)
-
     slides: list[SlideInfo] = []
-    for idx, (raw, start_line, end_line) in enumerate(raw_slides):
-        # Extract frontmatter
+    for idx, raw in enumerate(split_slides(raw_content)):
         frontmatter, content = parse_frontmatter(raw)
-
-        # Extract notes
         content, note = extract_notes(content)
-
-        # Transform region tags before clicks and markdown
         content = transform_regions(content)
-
-        # Transform click tags before markdown rendering
         content, max_clicks = transform_click_tags(content)
 
-        # Render markdown to HTML
-        html_content = md.render(content)
-
-        slide = SlideInfo(
-            content=html_content,
-            raw=raw,
+        slides.append(SlideInfo(
+            content=md.render(content),
             index=idx,
-            start_line=start_line,
-            end_line=end_line,
             frontmatter=frontmatter,
             note=note,
             max_clicks=max_clicks,
-        )
-        slides.append(slide)
+        ))
 
-    # Deck-level config from first slide's frontmatter
     deck_fm = slides[0].frontmatter if slides else {}
-    config_fields = {k: deck_fm[k] for k in ("title", "theme", "transition") if k in deck_fm and deck_fm[k]}
-    return Deck(
-        slides=slides,
-        config=DeckConfig(**config_fields),
-        filepath=filepath,
-        raw=raw_content,
-    )
+    config_fields = {k: deck_fm[k] for k in ("title", "transition") if k in deck_fm and deck_fm[k]}
+    return Deck(slides=slides, config=DeckConfig(**config_fields))

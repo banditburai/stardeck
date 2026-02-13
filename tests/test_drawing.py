@@ -48,7 +48,7 @@ def test_drawing_canvas_is_readonly(client):
 
 def test_drawing_store_apply_and_snapshot():
     """DrawingStore should apply changes and return snapshots."""
-    from stardeck.drawing_relay import DrawingStore
+    from stardeck.models import DrawingStore
 
     store = DrawingStore()
     changes = [
@@ -66,7 +66,7 @@ def test_drawing_store_apply_and_snapshot():
 
 def test_drawing_store_delete():
     """DrawingStore should handle delete changes."""
-    from stardeck.drawing_relay import DrawingStore
+    from stardeck.models import DrawingStore
 
     store = DrawingStore()
     store.apply_changes(0, [
@@ -82,7 +82,7 @@ def test_drawing_store_delete():
 
 def test_drawing_store_update():
     """DrawingStore should handle update changes."""
-    from stardeck.drawing_relay import DrawingStore
+    from stardeck.models import DrawingStore
 
     store = DrawingStore()
     store.apply_changes(0, [
@@ -99,7 +99,7 @@ def test_drawing_store_update():
 
 def test_drawing_store_multiple_slides():
     """DrawingStore should keep elements separated by slide."""
-    from stardeck.drawing_relay import DrawingStore
+    from stardeck.models import DrawingStore
 
     store = DrawingStore()
     store.apply_changes(0, [{"type": "create", "element": {"id": "el-1"}}])
@@ -113,7 +113,7 @@ def test_drawing_store_multiple_slides():
 
 def test_drawing_store_reorder():
     """DrawingStore should reorder elements and filter out deleted IDs."""
-    from stardeck.drawing_relay import DrawingStore
+    from stardeck.models import DrawingStore
 
     store = DrawingStore()
     store.apply_changes(0, [
@@ -136,7 +136,7 @@ def test_drawing_store_reorder():
 
 def test_drawing_store_empty_snapshot():
     """DrawingStore should return empty list for slides with no drawings."""
-    from stardeck.drawing_relay import DrawingStore
+    from stardeck.models import DrawingStore
 
     store = DrawingStore()
     assert store.get_snapshot(0) == []
@@ -146,7 +146,7 @@ def test_drawing_store_empty_snapshot():
 def test_presentation_state_has_drawing_store(tmp_path: Path):
     """PresentationState should include DrawingStore."""
     from stardeck.server import create_app
-    from stardeck.drawing_relay import DrawingStore
+    from stardeck.models import DrawingStore
 
     md_file = tmp_path / "slides.md"
     md_file.write_text("# Slide 1")

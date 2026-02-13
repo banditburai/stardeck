@@ -47,6 +47,21 @@ def get_theme_css(theme_name: str = "default") -> str:
     raise FileNotFoundError(f"Theme '{theme_name}' not found or missing styles.css")
 
 
+def deck_hdrs(theme: str = "default") -> list:
+    """Header elements shared between server and export."""
+    from starhtml import Link, Script, Style, iconify_script
+
+    return [
+        Script(src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"),
+        iconify_script(),
+        Link(
+            rel="stylesheet",
+            href="https://fonts.googleapis.com/css2?family=Shantell+Sans:wght@400;700&display=swap",
+        ),
+        Style(get_theme_css(theme)),
+    ]
+
+
 def list_themes() -> list[str]:
     """List available theme names.
 

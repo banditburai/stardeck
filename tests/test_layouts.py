@@ -10,18 +10,11 @@ from stardeck.renderer import render_slide
 
 
 def _deck(slide):
-    return Deck(slides=[slide], config=DeckConfig(), filepath=Path("t.md"), raw="")
+    return Deck(slides=[slide], config=DeckConfig())
 
 
 def _slide(content="<h1>Hi</h1>", frontmatter=None, index=0):
-    return SlideInfo(
-        content=content,
-        raw="",
-        index=index,
-        start_line=0,
-        end_line=0,
-        frontmatter=frontmatter or {},
-    )
+    return SlideInfo(content=content, index=index, frontmatter=frontmatter or {})
 
 
 # --- class frontmatter ---
