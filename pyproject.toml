@@ -6,8 +6,9 @@ readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.12"
 dependencies = [
-    "starhtml>=0.5.3",
-    "star-drawing>=0.1.0",
+    "starhtml>=0.5.5",
+    "starelements>=0.1.2",
+    "star-drawing>=0.1.1",
     "markdown-it-py",
     "mdit-py-plugins",
     "pygments",
@@ -134,7 +135,3 @@ reportAttributeAccessIssue = false
 reportAssignmentType = false
 reportPossiblyUnboundVariable = false
 
-[tool.uv.sources]
-starhtml = { path = "../starhtml-upstream", editable = true }
-star-drawing = { path = "../star-drawing", editable = true }
-starelements = { path = "../starelements", editable = true }

@@ -93,5 +93,8 @@ scratchpad/
 .beads/
 AGENTS.md
 
-# Design documents
+# Internal design/planning documents
 DESIGN-*.md
+progress.md
+PRD.md
+docs/
