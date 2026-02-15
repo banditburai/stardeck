@@ -141,6 +141,7 @@ def test_extract_notes_multiple_blocks():
 
 # --- Click tag tests (CSS mode) ---
 
+
 def test_transform_click_tags_css_mode():
     content = "<click>First</click><click>Second</click>"
     cr = transform_click_tags(content)
@@ -346,10 +347,7 @@ def test_parse_deck_click_duration_frontmatter(tmp_path):
 
 def test_parse_deck_per_slide_click_duration(tmp_path):
     md = tmp_path / "slides.md"
-    md.write_text(
-        "# S1\n<click>A</click>\n"
-        "---\nclick-duration: 800\n---\n# S2\n<click>B</click>"
-    )
+    md.write_text("# S1\n<click>A</click>\n---\nclick-duration: 800\n---\n# S2\n<click>B</click>")
     deck = parse_deck(md, use_motion=True)
     assert "enter_duration:300" in deck.slides[0].content  # default
     assert "enter_duration:800" in deck.slides[1].content
@@ -358,14 +356,17 @@ def test_parse_deck_per_slide_click_duration(tmp_path):
 def test_inline_duration_overrides_default():
     defaults = ClickDefaults(duration=500)
     cr = transform_click_tags(
-        '<click duration="200">A</click>', defaults=defaults, use_motion=True,
+        '<click duration="200">A</click>',
+        defaults=defaults,
+        use_motion=True,
     )
     assert "enter_duration:200" in cr.content
 
 
 def test_inline_spring():
     cr = transform_click_tags(
-        '<click spring="gentle">A</click>', use_motion=True,
+        '<click spring="gentle">A</click>',
+        use_motion=True,
     )
     assert "enter_spring:gentle" in cr.content
 
@@ -373,7 +374,8 @@ def test_inline_spring():
 def test_inline_custom_transform():
     """Direct x/y/scale/rotate bypass preset."""
     cr = transform_click_tags(
-        '<click x="30" opacity="0">A</click>', use_motion=True,
+        '<click x="30" opacity="0">A</click>',
+        use_motion=True,
     )
     assert "enter_x:30" in cr.content
     assert "enter_opacity:0" in cr.content
@@ -382,7 +384,8 @@ def test_inline_custom_transform():
 
 def test_inline_exit_attrs():
     cr = transform_click_tags(
-        '<click exit-duration="400" exit-opacity="0">A</click>', use_motion=True,
+        '<click exit-duration="400" exit-opacity="0">A</click>',
+        use_motion=True,
     )
     assert "exit_duration:400" in cr.content
     assert "exit_opacity:0" in cr.content
@@ -390,13 +393,15 @@ def test_inline_exit_attrs():
 
 def test_mixed_animation_and_duration():
     cr = transform_click_tags(
-        '<click animation="slide-up" duration="600">A</click>', use_motion=True,
+        '<click animation="slide-up" duration="600">A</click>',
+        use_motion=True,
     )
     assert "enter_preset:slide-up" in cr.content
     assert "enter_duration:600" in cr.content
 
 
 # --- Phase 1: <after> tag ---
+
 
 def test_after_css_mode():
     content = "<click>A</click><after>B</after>"
@@ -449,6 +454,7 @@ def test_after_with_no_preceding_click():
 
 
 # --- Phase 2: <click hide> ---
+
 
 def test_hide_css_mode():
     content = "<click hide>Goes away</click>"
@@ -520,6 +526,7 @@ def test_multiple_hide_after_pairs():
 
 # --- Phase 3: <clicks> wrapper ---
 
+
 def test_clicks_wrapper_basic():
     content = "<clicks>\n\nFirst\n\nSecond\n\nThird\n\n</clicks>"
     result = transform_clicks_wrapper(content)
@@ -563,6 +570,7 @@ def test_clicks_wrapper_single_paragraph():
 
 
 # --- Phase 4: Click ranges at= ---
+
 
 def test_at_explicit_number_css():
     content = '<click at="3">Late</click>'
@@ -617,12 +625,7 @@ def test_at_with_hide():
 
 def test_max_clicks_accounting():
     """max_clicks = max(sequential_counter, highest_explicit)."""
-    content = (
-        '<click>A</click>'
-        '<click at="10">B</click>'
-        '<click>C</click>'
-        '<click>D</click>'
-    )
+    content = '<click>A</click><click at="10">B</click><click>C</click><click>D</click>'
     cr = transform_click_tags(content)
     assert cr.max_clicks == 10  # max(3, 10)
 
@@ -642,6 +645,7 @@ def test_range_signal_generation():
 
 
 # --- Code protection ---
+
 
 def test_click_in_backtick_not_matched():
     """Backtick inline code `<click>` should not be matched as a click tag."""

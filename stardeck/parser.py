@@ -213,32 +213,26 @@ def _resolve_click_number(tag_name, at_val, current_click):
 
 
 def _click_div(
-    inner: str, data_click: str, *, hide: bool = False,
-    sig_name: str, css_expr: str, attrs: dict, defaults: ClickDefaults,
+    inner: str,
+    data_click: str,
+    *,
+    hide: bool = False,
+    sig_name: str,
+    css_expr: str,
+    attrs: dict,
+    defaults: ClickDefaults,
     use_motion: bool,
 ) -> str:
     if hide:
-        return (
-            f'<div class="click-hide" data-click="{data_click}"'
-            f' data-class:click-hidden="{css_expr}">'
-            f"{inner}</div>"
-        )
+        return f'<div class="click-hide" data-click="{data_click}" data-class:click-hidden="{css_expr}">{inner}</div>'
     if not use_motion:
-        return (
-            f'<div class="click-reveal" data-click="{data_click}"'
-            f' data-class:revealed="{css_expr}">'
-            f"{inner}</div>"
-        )
+        return f'<div class="click-reveal" data-click="{data_click}" data-class:revealed="{css_expr}">{inner}</div>'
     motion_str = visibility(
         signal=sig_name,
         enter=enter(**_build_enter_kwargs(attrs, defaults)),
         exit_=exit_(**_build_exit_kwargs(attrs)),
     )
-    return (
-        f'<div class="click-reveal" data-click="{data_click}"'
-        f' data-motion="{motion_str}">'
-        f"{inner}</div>"
-    )
+    return f'<div class="click-reveal" data-click="{data_click}" data-motion="{motion_str}">{inner}</div>'
 
 
 def _process_match(match, current_click, highest_click, range_clicks, defaults, use_motion):
@@ -247,7 +241,9 @@ def _process_match(match, current_click, highest_click, range_clicks, defaults, 
     hide = _is_bare_attr(tag_attrs, "hide")
 
     click_num, lo, hi, is_range, current_click = _resolve_click_number(
-        match.group(1), attrs.get("at"), current_click,
+        match.group(1),
+        attrs.get("at"),
+        current_click,
     )
     if is_range:
         highest_click = max(highest_click, hi)
@@ -263,9 +259,14 @@ def _process_match(match, current_click, highest_click, range_clicks, defaults, 
         css_expr = f"$clicks >= {click_num}"
 
     html = _click_div(
-        match.group(3), data_click, hide=hide,
-        sig_name=sig_name, css_expr=css_expr, attrs=attrs,
-        defaults=defaults, use_motion=use_motion,
+        match.group(3),
+        data_click,
+        hide=hide,
+        sig_name=sig_name,
+        css_expr=css_expr,
+        attrs=attrs,
+        defaults=defaults,
+        use_motion=use_motion,
     )
     return html, click_num, hide, current_click, highest_click
 
@@ -293,22 +294,28 @@ def transform_click_tags(
 
     while i < len(matches):
         match = matches[i]
-        parts.append(content[last_end:match.start()])
+        parts.append(content[last_end : match.start()])
 
         html, click_num, hide, current_click, highest_click = _process_match(
-            match, current_click, highest_click, range_clicks, defaults, use_motion,
+            match,
+            current_click,
+            highest_click,
+            range_clicks,
+            defaults,
+            use_motion,
         )
 
         # Detect hide+after pair: wrap in .click-swap so they crossfade in-place
-        next_is_after = (
-            hide
-            and i + 1 < len(matches)
-            and matches[i + 1].group(1) == "after"
-        )
+        next_is_after = hide and i + 1 < len(matches) and matches[i + 1].group(1) == "after"
         if next_is_after:
             after_match = matches[i + 1]
             after_html, _, _, current_click, highest_click = _process_match(
-                after_match, current_click, highest_click, range_clicks, defaults, use_motion,
+                after_match,
+                current_click,
+                highest_click,
+                range_clicks,
+                defaults,
+                use_motion,
             )
             parts.append(f'<div class="click-swap">{html}{after_html}</div>')
             last_end = after_match.end()
@@ -427,7 +434,9 @@ def parse_deck(filepath: Path, *, use_motion: bool = False) -> Deck:
         content = transform_clicks_wrapper(content)
         defaults = _resolve_click_defaults(first_fm, frontmatter)
         result = transform_click_tags(
-            content, defaults=defaults, use_motion=use_motion,
+            content,
+            defaults=defaults,
+            use_motion=use_motion,
         )
 
         slides.append(
@@ -442,23 +451,24 @@ def parse_deck(filepath: Path, *, use_motion: bool = False) -> Deck:
         )
 
     deck_fm = slides[0].frontmatter if slides else {}
-    config_keys = ("title", "theme", "transition", "click-animation",
-                   "click-duration", "click-delay", "click-ease", "click-spring")
-    config_fields = {
-        k.replace("-", "_"): deck_fm[k]
-        for k in config_keys
-        if deck_fm.get(k) is not None
-    }
+    config_keys = (
+        "title",
+        "theme",
+        "transition",
+        "click-animation",
+        "click-duration",
+        "click-delay",
+        "click-ease",
+        "click-spring",
+    )
+    config_fields = {k.replace("-", "_"): deck_fm[k] for k in config_keys if deck_fm.get(k) is not None}
     return Deck(slides=slides, config=DeckConfig(**config_fields))
 
 
 def deck_has_clicks(deck_path: Path) -> bool:
     """Quick scan for click-related tags without full parsing."""
     text = deck_path.read_text()
-    return any(
-        f"<{tag}>" in text or f"<{tag} " in text
-        for tag in ("click", "after", "clicks")
-    )
+    return any(f"<{tag}>" in text or f"<{tag} " in text for tag in ("click", "after", "clicks"))
 
 
 def build_click_signals(deck: Deck, clicks_signal) -> list:
@@ -470,8 +480,5 @@ def build_click_signals(deck: Deck, clicks_signal) -> list:
     for s in deck.slides:
         all_ranges.update(s.range_clicks)
 
-    sigs.extend(
-        Signal(f"vis_{lo}_{hi}", (clicks_signal >= lo) & (clicks_signal < hi))
-        for lo, hi in sorted(all_ranges)
-    )
+    sigs.extend(Signal(f"vis_{lo}_{hi}", (clicks_signal >= lo) & (clicks_signal < hi)) for lo, hi in sorted(all_ranges))
     return sigs

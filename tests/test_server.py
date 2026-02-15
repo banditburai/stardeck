@@ -300,7 +300,7 @@ def test_yield_presenter_updates_last_slide(tmp_path: Path):
     md_file = mk_deck(tmp_path, "# Only")
     deck = parse_deck(md_file)
     events = list(yield_presenter_updates(deck, 0))
-    html = "".join(to_xml(e) if hasattr(e, '__ft__') else str(e) for e in events)
+    html = "".join(to_xml(e) if hasattr(e, "__ft__") else str(e) for e in events)
     assert "End of presentation" in html
 
 

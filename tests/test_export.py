@@ -51,7 +51,7 @@ def test_assets_skipped_when_absent(tmp_path):
 
 
 def test_asset_paths_rewritten(tmp_path):
-    deck_path = mk_deck(tmp_path, '---\nbackground: ./bg.jpg\n---\n# Slide')
+    deck_path = mk_deck(tmp_path, "---\nbackground: ./bg.jpg\n---\n# Slide")
     (tmp_path / "assets").mkdir()
     export_deck(deck_path, tmp_path / "out")
     html = (tmp_path / "out" / "index.html").read_text()

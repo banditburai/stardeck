@@ -7,8 +7,7 @@ from stardeck.server import PresentationState
 def _deck(*max_clicks_per_slide: int) -> Deck:
     """Build a minimal Deck with the given max_clicks per slide."""
     slides = [
-        SlideInfo(content=f"<h1>Slide {i}</h1>", index=i, max_clicks=mc)
-        for i, mc in enumerate(max_clicks_per_slide)
+        SlideInfo(content=f"<h1>Slide {i}</h1>", index=i, max_clicks=mc) for i, mc in enumerate(max_clicks_per_slide)
     ]
     return Deck(slides=slides, config=DeckConfig())
 

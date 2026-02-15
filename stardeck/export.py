@@ -129,7 +129,9 @@ def export_deck(deck_path: Path, output_dir: Path, theme: str | None = None) -> 
                 Div(
                     Button("←", cls="nav-btn", data_on_click=back_nav, data_attr_disabled=slide_index == 0),
                     Span(f"1 / {deck.total}", data_text=slide_index + 1 + " / " + total_slides, cls="slide-counter"),
-                    Button("→", cls="nav-btn", data_on_click=fwd_nav, data_attr_disabled=slide_index == total_slides - 1),
+                    Button(
+                        "→", cls="nav-btn", data_on_click=fwd_nav, data_attr_disabled=slide_index == total_slides - 1
+                    ),
                     cls="navigation-bar",
                 ),
                 Span(

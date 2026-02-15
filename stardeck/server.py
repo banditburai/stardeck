@@ -337,14 +337,18 @@ def create_app(deck_path: Path, *, theme: str | None = None, watch: bool = False
                     [
                         is_grid_key.then(seq(evt.preventDefault(), grid_open.toggle())),
                         (is_esc & grid_open).then(seq(evt.preventDefault(), grid_open.set(False))),
-                        (not_grid & is_right).then(seq(
-                            evt.preventDefault(),
-                            can_click_fwd.if_(clicks.add(1), get("/api/slide/next")),
-                        )),
-                        (not_grid & is_left).then(seq(
-                            evt.preventDefault(),
-                            can_click_back.if_(clicks.sub(1), get("/api/slide/prev")),
-                        )),
+                        (not_grid & is_right).then(
+                            seq(
+                                evt.preventDefault(),
+                                can_click_fwd.if_(clicks.add(1), get("/api/slide/next")),
+                            )
+                        ),
+                        (not_grid & is_left).then(
+                            seq(
+                                evt.preventDefault(),
+                                can_click_back.if_(clicks.sub(1), get("/api/slide/prev")),
+                            )
+                        ),
                     ],
                     {"window": True},
                 ),
