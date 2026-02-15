@@ -5,6 +5,8 @@
  * Inspired by Slidev's aesthetic.
  */
 
+:root { color-scheme: dark; }
+
 /* CSS Variables */
 .stardeck-root {
     --accent: #4ec5d4;

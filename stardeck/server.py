@@ -41,7 +41,7 @@ from stardeck.renderer import (
     build_grid_modal,
     render_slide,
 )
-from stardeck.themes import deck_hdrs
+from stardeck.themes import deck_hdrs, get_theme_bg, get_theme_color_scheme
 
 _AUDIENCE_CANVAS = "#audience-canvas"
 _SSE_TIMEOUT = 30.0
@@ -195,10 +195,11 @@ def yield_presenter_updates(deck, slide_idx: int, clicks: int = 0, *, drawing_sn
         yield execute_script(_drawing_script("drawing-canvas", snapshot_json, clear=True))
 
 
-def create_app(deck_path: Path, *, theme: str = "default", watch: bool = False):
+def create_app(deck_path: Path, *, theme: str | None = None, watch: bool = False):
     deck_path = deck_path.resolve()
     has_clicks = deck_has_clicks(deck_path)
     initial_deck = parse_deck(deck_path, use_motion=has_clicks)
+    theme = theme or initial_deck.config.theme or "default"
     presenter_token = secrets.token_urlsafe(16)
     deck_state = {
         "deck": initial_deck,
@@ -227,6 +228,7 @@ def create_app(deck_path: Path, *, theme: str = "default", watch: bool = False):
     app, rt = star_app(
         title=initial_deck.config.title,
         hdrs=deck_hdrs(theme),
+        htmlkw={"style": f"background:{get_theme_bg(theme)}", "data-theme": get_theme_color_scheme(theme)},
         live=False,
         lifespan=watch_lifespan,
     )

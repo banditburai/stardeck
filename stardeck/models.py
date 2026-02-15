@@ -29,6 +29,7 @@ class SlideInfo:
 @dataclass(frozen=True)
 class DeckConfig:
     title: str = "Untitled"
+    theme: str | None = None
     transition: str = "fade"
     click_animation: str = "fade"
     click_duration: int | None = None

@@ -44,6 +44,24 @@ def list_themes() -> list[str]:
     ]
 
 
+def get_theme_bg(theme_name: str = "default") -> str:
+    """Background color for flash prevention — used as inline style on <html>."""
+    try:
+        mod = import_module(f"stardeck.themes.{theme_name}")
+        return getattr(mod, "VARIABLES", {}).get("bg-dark", "#121212")
+    except ModuleNotFoundError:
+        return "#121212"
+
+
+def get_theme_color_scheme(theme_name: str = "default") -> str:
+    """'light' or 'dark' — drives data-theme attr for upstream skeleton compat."""
+    try:
+        mod = import_module(f"stardeck.themes.{theme_name}")
+        return getattr(mod, "COLOR_SCHEME", "dark")
+    except ModuleNotFoundError:
+        return "dark"
+
+
 def get_theme_metadata(theme_name: str = "default") -> dict:
     """Get metadata for a theme."""
     try:

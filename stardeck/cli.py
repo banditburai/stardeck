@@ -16,7 +16,7 @@ def cli():
 @cli.command()
 @click.argument("slides", type=click.Path(exists=True, path_type=Path))
 @click.option("--port", "-p", default=5001, help="Port to run the server on.")
-@click.option("--theme", "-t", default="default", help="Theme to use.")
+@click.option("--theme", "-t", default=None, help="Theme (default: from frontmatter or 'default').")
 @click.option("--watch", "-w", is_flag=True, help="Watch for file changes and hot reload.")
 @click.option("--share", is_flag=True, help="Create a public tunnel to share the presentation.")
 @click.option("--share-token", help="Pinggy token for persistent/custom tunnel URLs.")
@@ -68,7 +68,7 @@ def run(slides: Path, port: int, theme: str, watch: bool, share: bool, share_tok
 @cli.command()
 @click.argument("slides", type=click.Path(exists=True, path_type=Path))
 @click.option("--output", "-o", default="dist", type=click.Path(path_type=Path), help="Output directory.")
-@click.option("--theme", "-t", default="default", help="Theme to use.")
+@click.option("--theme", "-t", default=None, help="Theme (default: from frontmatter or 'default').")
 def export(slides: Path, output: Path, theme: str):
     """Export a presentation as standalone HTML."""
     from stardeck.export import export_deck

@@ -201,3 +201,185 @@ def test_server_detects_clicks_wrapper(tmp_path: Path):
     app, _rt, _state = create_app(md_file)
     html = TestClient(app).get("/").text
     assert "data-motion=" in html
+
+
+# --- Presenter endpoints ---
+
+
+def test_presenter_next_endpoint(tmp_path: Path):
+    from stardeck.server import create_app
+
+    md_file = mk_deck(tmp_path, "# S1\n---\n# S2\n---\n# S3")
+    app, _rt, state = create_app(md_file)
+    client = TestClient(app)
+    resp = client.get("/api/presenter/next")
+    assert resp.status_code == 200
+    assert "text/event-stream" in resp.headers["content-type"]
+    assert state["presentation"].slide_index == 1
+
+
+def test_presenter_prev_endpoint(tmp_path: Path):
+    from stardeck.server import create_app
+
+    md_file = mk_deck(tmp_path, "# S1\n---\n# S2\n---\n# S3")
+    app, _rt, state = create_app(md_file)
+    pres = state["presentation"]
+    pres.slide_index = 2
+    resp = TestClient(app).get("/api/presenter/prev")
+    assert resp.status_code == 200
+    assert pres.slide_index == 1
+
+
+def test_presenter_goto_endpoint(tmp_path: Path):
+    from stardeck.server import create_app
+
+    md_file = mk_deck(tmp_path, "# S1\n---\n# S2\n---\n# S3")
+    app, _rt, state = create_app(md_file)
+    resp = TestClient(app).get("/api/presenter/goto/2")
+    assert resp.status_code == 200
+    assert state["presentation"].slide_index == 2
+
+
+def test_presenter_changes_unauthorized(tmp_path: Path):
+    from stardeck.server import create_app
+
+    md_file = mk_deck(tmp_path, "# S1")
+    app, _rt, _state = create_app(md_file)
+    resp = TestClient(app).post("/api/presenter/changes?token=wrong", json={"changes": []})
+    assert resp.status_code == 401
+
+
+def test_presenter_changes_invalid_json(tmp_path: Path):
+    from stardeck.server import create_app
+
+    md_file = mk_deck(tmp_path, "# S1")
+    app, _rt, state = create_app(md_file)
+    token = state["presenter_token"]
+    resp = TestClient(app).post(
+        f"/api/presenter/changes?token={token}",
+        content=b"not json",
+        headers={"content-type": "application/json"},
+    )
+    assert resp.status_code == 400
+
+
+def test_presenter_changes_applies_drawing(tmp_path: Path):
+    from stardeck.server import create_app
+
+    md_file = mk_deck(tmp_path, "# S1")
+    app, _rt, state = create_app(md_file)
+    token = state["presenter_token"]
+    changes = [{"type": "path", "data": "M0,0 L10,10"}]
+    resp = TestClient(app).post(
+        f"/api/presenter/changes?token={token}",
+        json={"changes": changes, "slide_index": 0},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["applied"] == 1
+
+
+# --- Yield presenter updates ---
+
+
+def test_yield_presenter_updates_emits_signals(tmp_path: Path):
+    from stardeck.parser import parse_deck
+    from stardeck.server import yield_presenter_updates
+
+    md_file = mk_deck(tmp_path, "# S1\n---\n# S2")
+    deck = parse_deck(md_file)
+    events = list(yield_presenter_updates(deck, 0))
+    assert len(events) >= 3  # signals + current slide + next slide + notes
+
+
+def test_yield_presenter_updates_last_slide(tmp_path: Path):
+    """At last slide, next preview shows 'End of presentation'."""
+    from fastcore.xml import to_xml
+    from stardeck.parser import parse_deck
+    from stardeck.server import yield_presenter_updates
+
+    md_file = mk_deck(tmp_path, "# Only")
+    deck = parse_deck(md_file)
+    events = list(yield_presenter_updates(deck, 0))
+    html = "".join(to_xml(e) if hasattr(e, '__ft__') else str(e) for e in events)
+    assert "End of presentation" in html
+
+
+def test_yield_presenter_updates_with_snapshot(tmp_path: Path):
+    from stardeck.parser import parse_deck
+    from stardeck.server import yield_presenter_updates
+
+    md_file = mk_deck(tmp_path, "# S1")
+    deck = parse_deck(md_file)
+    snapshot = [{"type": "path", "data": "M0,0"}]
+    events = list(yield_presenter_updates(deck, 0, drawing_snapshot=snapshot))
+    # Should include the drawing script event
+    assert len(events) >= 4
+
+
+# --- PresentationState boundary ---
+
+
+def test_presentation_state_next_slide_at_end(tmp_path: Path):
+    from stardeck.parser import parse_deck
+    from stardeck.server import PresentationState
+
+    md_file = mk_deck(tmp_path, "# Only")
+    deck = parse_deck(md_file)
+    pres = PresentationState(deck)
+    assert pres.next_slide is None
+
+
+def test_presentation_state_next_slide_exists(tmp_path: Path):
+    from stardeck.parser import parse_deck
+    from stardeck.server import PresentationState
+
+    md_file = mk_deck(tmp_path, "# S1\n---\n# S2")
+    deck = parse_deck(md_file)
+    pres = PresentationState(deck)
+    assert pres.next_slide is not None
+    assert pres.next_slide.index == 1
+
+
+# --- Reload with signal dependency change ---
+
+
+def test_reload_triggers_page_reload_on_new_clicks(tmp_path: Path):
+    """When reloaded deck has more click signals, force full page reload."""
+    from stardeck.server import create_app
+
+    md_file = mk_deck(tmp_path, "# S1")
+    app, _rt, state = create_app(md_file)
+    client = TestClient(app)
+
+    # Rewrite file to have clicks (increases max_clicks)
+    md_file.write_text("# S1\n<click>A</click>\n<click>B</click>")
+    resp = client.get("/api/reload")
+    assert "window.location.reload()" in resp.text
+
+
+def test_reload_triggers_page_reload_on_new_ranges(tmp_path: Path):
+    """When reloaded deck has new range signals, force full page reload."""
+    from stardeck.server import create_app
+
+    md_file = mk_deck(tmp_path, "# S1\n<click>A</click>")
+    app, _rt, state = create_app(md_file)
+    client = TestClient(app)
+
+    md_file.write_text('# S1\n<click>A</click>\n<click at="2-4">B</click>')
+    resp = client.get("/api/reload")
+    assert "window.location.reload()" in resp.text
+
+
+# --- Assets dir registration ---
+
+
+def test_server_with_assets_dir(tmp_path: Path):
+    from stardeck.server import create_app
+
+    md_file = mk_deck(tmp_path, "# S1")
+    (tmp_path / "assets").mkdir()
+    (tmp_path / "assets" / "img.png").write_bytes(b"\x89PNG")
+    app, _rt, _state = create_app(md_file)
+    # Asset should be served
+    resp = TestClient(app).get("/assets/img.png")
+    assert resp.status_code == 200

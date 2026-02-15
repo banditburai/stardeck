@@ -7,6 +7,7 @@ NAME = "default"
 DESCRIPTION = "Clean dark theme with teal accents"
 AUTHOR = "StarDeck"
 VERSION = "1.0.0"
+COLOR_SCHEME = "dark"
 
 # CSS variables that define this theme's look
 # These can be overridden in slide frontmatter

@@ -7,6 +7,7 @@ NAME = "light"
 DESCRIPTION = "Clean light theme with teal accents"
 AUTHOR = "StarDeck"
 VERSION = "1.0.0"
+COLOR_SCHEME = "light"
 
 VARIABLES = {
     "accent": "#0d9488",

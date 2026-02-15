@@ -4,6 +4,8 @@
  * A clean, light theme with teal accents on a warm white background.
  */
 
+:root { color-scheme: light; }
+
 /* CSS Variables */
 .stardeck-root {
     --accent: #0d9488;

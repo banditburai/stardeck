@@ -5,7 +5,7 @@ Developer-first presentation tool for Python. Write slides in Markdown, present 
 ## Features
 
 - **Markdown slides** — Write in familiar Markdown with `---` separators
-- **Click animations** — Progressive reveal with `<click>` tags
+- **Click animations** — Progressive reveal, hide, swap, bulk wrap, and explicit ranges with Motion-powered animations
 - **Layouts** — cover, center, two-cols, three-cols, grid, quote, section, steps, and more
 - **Region tags** — `<left>`, `<right>`, `<item>`, `<step>` for structured layouts
 - **Inline HTML + Tailwind** — Use any HTML with Tailwind CSS v4 classes in your slides
@@ -100,7 +100,7 @@ class: items-center justify-center
 ---
 ```
 
-The first slide's frontmatter also sets deck-wide options: `title` (page title) and `transition` (default transition for all slides).
+The first slide's frontmatter also sets deck-wide options: `title` (page title), `transition` (default transition), and click animation defaults (`click-animation`, `click-duration`, `click-delay`, `click-ease`, `click-spring`).
 
 ### Click Animations
 
@@ -114,22 +114,118 @@ Wrap content in `<click>` tags for progressive reveal:
 
 Press arrow keys or Space to step through clicks before advancing to the next slide.
 
-Click reveals are powered by the [Motion](https://motion.dev) animation library in server mode, with spring physics and configurable presets. Set the animation per-click or per-slide:
+Click reveals are powered by the [Motion](https://motion.dev) animation library in server mode, with spring physics and configurable presets.
+
+**Available presets:** `fade` (default), `slide-up`, `slide-down`, `slide-left`, `slide-right`, `scale`, `bounce`.
+
+#### Animation attributes
+
+Set the animation per-click with inline attributes:
 
 ```markdown
 <click animation="slide-up">Slides up into view</click>
-<click animation="bounce">Bounces in</click>
+<click animation="scale" duration="500">Slow scale-in</click>
+<click animation="bounce" spring="bouncy">Bouncy entrance</click>
 ```
 
-Or set a default for the entire deck via frontmatter:
+| Attribute | Description | Example |
+|-----------|-------------|---------|
+| `animation` | Preset name | `animation="slide-up"` |
+| `duration` | Duration in ms | `duration="500"` |
+| `delay` | Delay before animation in ms | `delay="200"` |
+| `ease` | CSS easing function | `ease="ease-in-out"` |
+| `spring` | Spring physics preset | `spring="bouncy"` |
+
+Spring presets: `gentle`, `bouncy`, `tight`, `slow`.
+
+#### Custom transforms
+
+Override presets entirely with individual transform properties:
+
+```markdown
+<click x="30" opacity="0">Slide in from right with fade</click>
+<click y="-20" scale="0.8">Drop in and grow</click>
+<click rotate="10" opacity="0">Rotate in</click>
+```
+
+Properties: `x`, `y`, `scale`, `rotate`, `opacity`. When any transform property is set, the preset is bypassed.
+
+#### Exit animations
+
+Control how elements animate out when stepping backwards:
+
+```markdown
+<click exit-opacity="0" exit-duration="200">Fast fade out on reverse</click>
+```
+
+Exit attributes mirror enter attributes with an `exit-` prefix: `exit-duration`, `exit-delay`, `exit-ease`, `exit-spring`, `exit-x`, `exit-y`, `exit-scale`, `exit-rotate`, `exit-opacity`.
+
+#### Per-slide and deck-wide defaults
+
+Set defaults via frontmatter — per-slide overrides deck-wide:
 
 ```markdown
 ---
-click-animation: scale
+click-animation: slide-up
+click-duration: 400
+click-spring: gentle
 ---
 ```
 
-**Available presets:** `fade` (default), `slide-up`, `slide-down`, `scale`, `bounce`.
+Deck-wide defaults go in the first slide's frontmatter. Per-slide frontmatter overrides them. Inline attributes on individual `<click>` tags override both.
+
+#### Same-step reveals with `<after>`
+
+`<after>` shares the same click step as the preceding `<click>`:
+
+```markdown
+<click>Main point (click 1)</click>
+<after>Also appears at click 1</after>
+<after>This too (click 1)</after>
+
+<click>Next point (click 2)</click>
+<after>Also at click 2</after>
+```
+
+#### Hide on click
+
+`<click hide>` starts visible and disappears on its click step:
+
+```markdown
+<click hide>This vanishes at click 1</click>
+<after>This replaces it at click 1</after>
+```
+
+A `<click hide>` followed by `<after>` creates a swap — the hide and reveal animate together in-place.
+
+#### Bulk reveals with `<clicks>`
+
+`<clicks>` wraps each paragraph in a `<click>` tag automatically:
+
+```markdown
+<clicks animation="slide-up">
+
+First point
+
+Second point
+
+Third point
+
+</clicks>
+```
+
+Attributes on `<clicks>` cascade to all children. Equivalent to writing three separate `<click animation="slide-up">` tags.
+
+#### Explicit numbering with `at=`
+
+Pin elements to specific click numbers or visibility ranges:
+
+```markdown
+<click at="3">Appears at click 3</click>
+<click at="2-4">Visible during clicks 2–3, gone at 4</click>
+```
+
+Sequential `<click>` tags and explicit `at=` numbering are independent — `max_clicks` is the maximum of both. Ranges can overlap.
 
 ### Speaker Notes
 

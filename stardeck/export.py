@@ -12,7 +12,7 @@ from starhtml.datastar import evt, js, seq
 
 from stardeck.parser import build_click_signals, deck_has_clicks, parse_deck
 from stardeck.renderer import HASH_UPDATE_EFFECT, render_slide
-from stardeck.themes import deck_hdrs
+from stardeck.themes import deck_hdrs, get_theme_bg, get_theme_color_scheme
 
 _MOTION_CRITICAL_CSS = "[data-motion]:not([data-motion-ready]){opacity:0}"
 _MOTION_LOADER = (
@@ -55,10 +55,11 @@ def _build_head(deck, theme: str, *, use_motion: bool) -> Head:
     return Head(*head_children)
 
 
-def export_deck(deck_path: Path, output_dir: Path, theme: str = "default") -> Path:
+def export_deck(deck_path: Path, output_dir: Path, theme: str | None = None) -> Path:
     """Export a presentation to a self-contained directory."""
     use_motion = deck_has_clicks(deck_path)
     deck = parse_deck(deck_path, use_motion=use_motion)
+    theme = theme or deck.config.theme or "default"
 
     mc_array = f"[{', '.join(str(s.max_clicks) for s in deck.slides)}]"
 
@@ -148,6 +149,8 @@ def export_deck(deck_path: Path, output_dir: Path, theme: str = "default") -> Pa
             ),
         ),
         lang="en",
+        style=f"background:{get_theme_bg(theme)}",
+        data_theme=get_theme_color_scheme(theme),
     )
 
     index_html = "<!DOCTYPE html>\n" + to_xml(page)

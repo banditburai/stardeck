@@ -442,7 +442,7 @@ def parse_deck(filepath: Path, *, use_motion: bool = False) -> Deck:
         )
 
     deck_fm = slides[0].frontmatter if slides else {}
-    config_keys = ("title", "transition", "click-animation",
+    config_keys = ("title", "theme", "transition", "click-animation",
                    "click-duration", "click-delay", "click-ease", "click-spring")
     config_fields = {
         k.replace("-", "_"): deck_fm[k]
