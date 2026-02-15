@@ -135,3 +135,69 @@ def test_goto_slide_clamps_clicks_to_max(tmp_path: Path):
     app, _rt, _state = create_app(md_file)
     sigs = parse_sse_signals(TestClient(app).get("/api/slide/0?clicks=100").text)
     assert sigs["clicks"] == 1  # max_clicks for slide 0 is 1
+
+
+def test_server_uses_motion_for_click_reveals(tmp_path: Path):
+    """Server-rendered slides use computed Signal + data-motion visibility."""
+    from stardeck.server import create_app
+
+    md_file = mk_deck(tmp_path, "# Slide\n<click>Reveal</click>")
+    app, _rt, _state = create_app(md_file)
+    html = TestClient(app).get("/").text
+    assert "data-motion=" in html
+    assert "type:visibility" in html
+    # Computed signal defined at page level by Signal("vis1", clicks >= 1)
+    assert "data-computed:vis1" in html
+    assert "signal:$vis1" in html
+
+
+def test_motion_plugin_not_loaded_without_clicks(tmp_path: Path):
+    """Decks without <click> tags should not load the motion plugin JS."""
+    from stardeck.server import create_app
+
+    md_file = mk_deck(tmp_path, "# Slide 1\n---\n# Slide 2")
+    app, _rt, _state = create_app(md_file)
+    html = TestClient(app).get("/").text
+    assert "data-motion=" not in html
+    assert "data-computed:vis" not in html
+
+
+def test_server_hide_uses_css_approach(tmp_path: Path):
+    """Decks with <click hide> use CSS opacity transitions, not data-motion."""
+    from stardeck.server import create_app
+
+    md_file = mk_deck(tmp_path, "# Slide\n<click hide>Gone</click>\n<click>Show</click>")
+    app, _rt, _state = create_app(md_file)
+    html = TestClient(app).get("/").text
+    assert "click-hide" in html
+    assert "data-class:click-hidden" in html
+
+
+def test_server_range_signal(tmp_path: Path):
+    """Decks with at= ranges produce vis_N_M computed signals."""
+    from stardeck.server import create_app
+
+    md_file = mk_deck(tmp_path, '# Slide\n<click at="2-4">Temp</click>')
+    app, _rt, _state = create_app(md_file)
+    html = TestClient(app).get("/").text
+    assert "data-computed:vis_2_4" in html
+
+
+def test_server_detects_after_tag(tmp_path: Path):
+    """Decks with only <after> tags still load motion plugin."""
+    from stardeck.server import create_app
+
+    md_file = mk_deck(tmp_path, "# Slide\n<click>A</click>\n<after>B</after>")
+    app, _rt, _state = create_app(md_file)
+    html = TestClient(app).get("/").text
+    assert "data-motion=" in html
+
+
+def test_server_detects_clicks_wrapper(tmp_path: Path):
+    """Decks with <clicks> wrapper load motion plugin."""
+    from stardeck.server import create_app
+
+    md_file = mk_deck(tmp_path, "# Slide\n<clicks>\n\nA\n\nB\n\n</clicks>")
+    app, _rt, _state = create_app(md_file)
+    html = TestClient(app).get("/").text
+    assert "data-motion=" in html

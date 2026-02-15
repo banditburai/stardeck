@@ -68,17 +68,154 @@ They won't be displayed in the presentation.
 
 Build your slides progressively:
 
-<click>First point appears</click>
+<click>First point fades in</click>
 
-<click>Then the second point</click>
+<click animation="slide-up">This slides up</click>
 
-<click>Finally the third!</click>
+<click animation="scale">This scales in</click>
+
+<click animation="slide-left">And this slides from the left</click>
 
 <!-- notes
-Demo the click animations:
-- Press → or Space to reveal each point
-- Press ← to hide them again
-- Notice the URL updates to #slide.click format
+Press → or Space to reveal each point.
+Press ← to reverse with exit animations.
+URL updates to #slide.click as you go.
+-->
+
+---
+click-animation: slide-up
+---
+
+## Progressive List
+
+A common pattern — reveal bullet points one at a time:
+
+<click>
+
+- **Step 1** — Install with `pip install stardeck`
+
+</click>
+
+<click>
+
+- **Step 2** — Write slides in Markdown with `---` separators
+
+</click>
+
+<click>
+
+- **Step 3** — Run `stardeck run slides.md` and present
+
+</click>
+
+<!-- notes
+Per-slide click-animation frontmatter sets the default.
+Each click wraps a full markdown block — not just text.
+-->
+
+---
+click-animation: slide-right
+click-duration: 500
+---
+
+## Advanced Click Controls
+
+Inline attributes give full control over each reveal:
+
+<click animation="slide-left" duration="400">Slide in from the left (400ms)</click>
+
+<click animation="slide-right" spring="bouncy">Bouncy slide from the right</click>
+
+<click duration="800" ease="ease-in-out">Slow fade with custom easing</click>
+
+<click x="30" opacity="0">Custom transform — no preset, pure x + opacity</click>
+
+<!-- notes
+Per-slide frontmatter: click-animation, click-duration, click-spring, click-ease.
+Inline attrs override defaults: animation, duration, delay, spring, ease.
+Custom transforms (x, y, scale, rotate, opacity) bypass presets entirely.
+Exit attrs: exit-duration, exit-opacity, etc.
+-->
+
+---
+
+## After Tags
+
+Elements appearing at the same click step:
+
+<click>Main point appears (click 1)</click>
+
+<after>This appears at the same time (also click 1)</after>
+
+<click>Next point (click 2)</click>
+
+<after>Also at click 2</after>
+
+<after>And this too (click 2)</after>
+
+<!-- notes
+<after> reuses the previous click number.
+Multiple afters chain to the same step.
+-->
+
+---
+
+## Click Hide
+
+Elements that start visible and disappear:
+
+<click hide>This text vanishes at click 1</click>
+
+<after>This text appears at click 1</after>
+
+<click hide>This vanishes at click 2</click>
+
+<after>This appears at click 2</after>
+
+<!-- notes
+<click hide> + <after> creates a swap — hide and show happen on the same click.
+<after> reuses the previous click number, so the pair animates together.
+-->
+
+---
+
+## Clicks Wrapper
+
+Auto-wrap each paragraph — no repetitive `<click>` tags:
+
+<clicks animation="slide-up">
+
+First item slides up
+
+Second item slides up
+
+Third item slides up
+
+</clicks>
+
+<!-- notes
+<clicks> splits by paragraph breaks and wraps each in <click>.
+Attributes cascade to all children.
+-->
+
+---
+
+## Click Ranges
+
+Explicit click numbering and timed visibility:
+
+<click at="1">Appears at click 1 (explicit)</click>
+
+<click at="2-4">Visible during clicks 2–3, gone at 4</click>
+
+<click at="3">Appears at click 3 (overlaps with range)</click>
+
+<click at="4">Appears at click 4 (after range ends)</click>
+
+<!-- notes
+at="N" pins to an explicit click number.
+at="N-M" creates a range — visible from N, hidden at M.
+Sequential counter and explicit numbers are independent.
 -->
 
 ---
@@ -109,7 +246,7 @@ layout: quote
 layout: fact
 ---
 
-# 120
+# 166
 
 tests passing
 
@@ -207,7 +344,7 @@ Run `stardeck run slides.md`
 </step>
 
 ---
-class: items-center justify-center text-center
+cls: items-center justify-center text-center
 ---
 
 # Tailwind Utilities

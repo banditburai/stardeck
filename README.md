@@ -114,6 +114,23 @@ Wrap content in `<click>` tags for progressive reveal:
 
 Press arrow keys or Space to step through clicks before advancing to the next slide.
 
+Click reveals are powered by the [Motion](https://motion.dev) animation library in server mode, with spring physics and configurable presets. Set the animation per-click or per-slide:
+
+```markdown
+<click animation="slide-up">Slides up into view</click>
+<click animation="bounce">Bounces in</click>
+```
+
+Or set a default for the entire deck via frontmatter:
+
+```markdown
+---
+click-animation: scale
+---
+```
+
+**Available presets:** `fade` (default), `slide-up`, `slide-down`, `scale`, `bounce`.
+
 ### Speaker Notes
 
 Add notes inside HTML comments with the `notes` keyword:

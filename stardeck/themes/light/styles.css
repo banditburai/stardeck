@@ -634,8 +634,8 @@
 .slide pre code .il { color: #005cc5 }  /* Literal.Number.Integer.Long */
 .slide pre code .fm { color: #6f42c1 }  /* Name.Function.Magic */
 
-/* Click reveals */
-.click-reveal {
+/* Click reveals — CSS-mode only (no data-motion attr) */
+.click-reveal:not([data-motion]) {
     opacity: 0;
     transform: translateY(10px);
     transition: opacity 0.3s ease-out, transform 0.3s ease-out;
@@ -646,6 +646,25 @@
     opacity: 1;
     transform: translateY(0);
     pointer-events: auto;
+}
+
+/* Click hide — fades out in-place, keeping layout space so nothing shifts. */
+.click-hide {
+    transition: opacity 0.3s ease-out;
+}
+
+.click-hide.click-hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Hide+after swap pairs */
+.click-swap {
+    display: grid;
+}
+
+.click-swap > * {
+    grid-area: 1 / 1;
 }
 
 /* Presenter Mode */

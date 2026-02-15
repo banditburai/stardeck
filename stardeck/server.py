@@ -14,7 +14,6 @@ from starhtml import (
     Relay,
     ScriptEvent,
     Signal,
-    SignalEvent,
     Span,
     elements,
     execute_script,
@@ -25,12 +24,12 @@ from starhtml import (
     star_app,
 )
 from starhtml.datastar import evt, js, seq
-from starhtml.plugins import resize
+from starhtml.plugins import motion, resize
 from starhtml.realtime import SSE_HEADERS
 from starlette.responses import JSONResponse, StreamingResponse
 
 from stardeck.models import DrawingStore
-from stardeck.parser import parse_deck
+from stardeck.parser import build_click_signals, deck_has_clicks, parse_deck
 from stardeck.presenter import create_presenter_view
 from stardeck.renderer import (
     HASH_UPDATE_EFFECT,
@@ -169,8 +168,9 @@ def _yield_presenter_with_snapshot(pres):
 
 def yield_audience_updates(deck, slide_idx: int, clicks: int = 0):
     current_slide = deck.slides[slide_idx]
-    yield signals(slide_index=slide_idx, clicks=clicks, max_clicks=current_slide.max_clicks)
+    # Elements first — replace stale data-class bindings before signals change
     yield elements(render_slide(current_slide, deck), "#slide-content", "inner")
+    yield signals(slide_index=slide_idx, clicks=clicks, max_clicks=current_slide.max_clicks)
 
 
 def yield_presenter_updates(deck, slide_idx: int, clicks: int = 0, *, drawing_snapshot: list[dict] | None = None):
@@ -197,7 +197,8 @@ def yield_presenter_updates(deck, slide_idx: int, clicks: int = 0, *, drawing_sn
 
 def create_app(deck_path: Path, *, theme: str = "default", watch: bool = False):
     deck_path = deck_path.resolve()
-    initial_deck = parse_deck(deck_path)
+    has_clicks = deck_has_clicks(deck_path)
+    initial_deck = parse_deck(deck_path, use_motion=has_clicks)
     presenter_token = secrets.token_urlsafe(16)
     deck_state = {
         "deck": initial_deck,
@@ -230,6 +231,8 @@ def create_app(deck_path: Path, *, theme: str = "default", watch: bool = False):
         lifespan=watch_lifespan,
     )
     app.register(DrawingCanvas)
+    if has_clicks or watch:
+        app.register(motion)
     app.register(resize)
 
     assets_dir = deck_path.parent / "assets"
@@ -260,6 +263,8 @@ def create_app(deck_path: Path, *, theme: str = "default", watch: bool = False):
         slide_scale = Signal("slide_scale", 1)
         grid_open = Signal("grid_open", False)
 
+        vis_signals = build_click_signals(deck, clicks)
+
         is_right = (evt.key == "ArrowRight") | (evt.key == " ")
         is_left = evt.key == "ArrowLeft"
         is_grid_key = (evt.key == "g") | (evt.key == "o")
@@ -281,6 +286,7 @@ def create_app(deck_path: Path, *, theme: str = "default", watch: bool = False):
             clicks,
             max_clicks,
             grid_open,
+            *vis_signals,
             Span(data_on_load=get("/api/events"), style="display:none"),
             Span(data_on_load=hash_nav_js, style="display:none"),
             Span(data_on_hashchange=(hash_nav_js, {"window": True}), style="display:none"),
@@ -308,10 +314,7 @@ def create_app(deck_path: Path, *, theme: str = "default", watch: bool = False):
                 Button(
                     "←",
                     cls="nav-btn",
-                    data_on_click=[
-                        can_click_back.then(clicks.sub(1)),
-                        (~can_click_back).then(get("/api/slide/prev")),
-                    ],
+                    data_on_click=can_click_back.if_(clicks.sub(1), get("/api/slide/prev")),
                     data_attr_disabled=slide_index == 0,
                 ),
                 Button(
@@ -322,10 +325,7 @@ def create_app(deck_path: Path, *, theme: str = "default", watch: bool = False):
                 Button(
                     "→",
                     cls="nav-btn",
-                    data_on_click=[
-                        can_click_fwd.then(clicks.add(1)),
-                        (~can_click_fwd).then(seq(clicks.set(0), get("/api/slide/next"))),
-                    ],
+                    data_on_click=can_click_fwd.if_(clicks.add(1), get("/api/slide/next")),
                     data_attr_disabled=slide_index == total_slides - 1,
                 ),
                 cls="navigation-bar",
@@ -335,12 +335,14 @@ def create_app(deck_path: Path, *, theme: str = "default", watch: bool = False):
                     [
                         is_grid_key.then(seq(evt.preventDefault(), grid_open.toggle())),
                         (is_esc & grid_open).then(seq(evt.preventDefault(), grid_open.set(False))),
-                        (not_grid & is_right).then(evt.preventDefault()),
-                        (not_grid & is_right & can_click_fwd).then(clicks.add(1)),
-                        (not_grid & is_right & ~can_click_fwd).then(seq(clicks.set(0), get("/api/slide/next"))),
-                        (not_grid & is_left).then(evt.preventDefault()),
-                        (not_grid & is_left & can_click_back).then(clicks.sub(1)),
-                        (not_grid & is_left & ~can_click_back).then(get("/api/slide/prev")),
+                        (not_grid & is_right).then(seq(
+                            evt.preventDefault(),
+                            can_click_fwd.if_(clicks.add(1), get("/api/slide/next")),
+                        )),
+                        (not_grid & is_left).then(seq(
+                            evt.preventDefault(),
+                            can_click_back.if_(clicks.sub(1), get("/api/slide/prev")),
+                        )),
                     ],
                     {"window": True},
                 ),
@@ -366,16 +368,9 @@ def create_app(deck_path: Path, *, theme: str = "default", watch: bool = False):
     @rt("/api/events")
     async def events():
         pres = deck_state["presentation"]
-        initial = [
-            SignalEvent(
-                {
-                    "slide_index": pres.slide_index,
-                    "clicks": pres.clicks,
-                    "max_clicks": pres.max_clicks,
-                    "total_slides": pres.deck.total,
-                }
-            ),
-        ]
+        # No initial signals — HTML already has correct state, and sending them
+        # here races with hash navigation, resetting clicks to 0.
+        initial = []
         snapshot = pres.drawing.get_snapshot(pres.slide_index)
         if snapshot:
             initial.append(ScriptEvent(_drawing_script(_AUDIENCE_CANVAS, json.dumps(snapshot))))
@@ -442,12 +437,26 @@ def create_app(deck_path: Path, *, theme: str = "default", watch: bool = False):
         clicks = max(0, min(clicks, current_deck.slides[idx].max_clicks))
         yield from yield_audience_updates(current_deck, idx, clicks)
 
+    def _signal_deps(deck):
+        """Hashable fingerprint of signals needed for a deck."""
+        mc = max((s.max_clicks for s in deck.slides), default=0)
+        ranges = frozenset().union(*(s.range_clicks for s in deck.slides)) if deck.slides else frozenset()
+        return mc, ranges
+
     @rt("/api/reload")
     @sse
     def reload_deck(slide_index: int = 0):
-        deck_state["deck"] = parse_deck(deck_state["path"])
-        current_deck = deck_state["deck"]
+        old_mc, old_ranges = _signal_deps(deck_state["deck"])
+        use_motion = deck_has_clicks(deck_state["path"])
+        current_deck = parse_deck(deck_state["path"], use_motion=use_motion)
+        deck_state["deck"] = current_deck
         deck_state["presentation"].reload_deck(current_deck)
+        new_mc, new_ranges = _signal_deps(current_deck)
+
+        if new_mc > old_mc or new_ranges - old_ranges:
+            yield execute_script("window.location.reload()")
+            return
+
         idx = min(slide_index, current_deck.total - 1)
         yield signals(total_slides=current_deck.total)
         yield from yield_audience_updates(current_deck, idx)

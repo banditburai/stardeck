@@ -11,6 +11,7 @@ class SlideInfo:
     note: str = ""
     title: str = ""
     max_clicks: int = 0
+    range_clicks: frozenset[tuple[int, int]] = field(default_factory=frozenset)
 
     @property
     def layout(self) -> str:
@@ -29,6 +30,11 @@ class SlideInfo:
 class DeckConfig:
     title: str = "Untitled"
     transition: str = "fade"
+    click_animation: str = "fade"
+    click_duration: int | None = None
+    click_delay: int | None = None
+    click_ease: str | None = None
+    click_spring: str | None = None
 
 
 @dataclass

@@ -875,7 +875,7 @@ provides-extras = ["test", "dev"]
 
 [[package]]
 name = "starhtml"
-version = "0.5.3"
+version = "0.5.4"
 source = { editable = "../starhtml-upstream" }
 dependencies = [
     { name = "beautifulsoup4" },

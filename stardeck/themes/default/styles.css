@@ -680,8 +680,11 @@
     color: white;
 }
 
-/* Click reveals - animated via CSS transitions */
-.click-reveal {
+/* Click reveals — CSS-mode only (no data-motion attr).
+   Motion-mode elements get hidden by the plugin's critical CSS
+   [data-motion]:not([data-motion-ready]){opacity:0} and then
+   the plugin controls display + animations directly. */
+.click-reveal:not([data-motion]) {
     opacity: 0;
     transform: translateY(10px);
     transition: opacity 0.3s ease-out, transform 0.3s ease-out;
@@ -692,6 +695,25 @@
     opacity: 1;
     transform: translateY(0);
     pointer-events: auto;
+}
+
+/* Click hide — fades out in-place, keeping layout space so nothing shifts. */
+.click-hide {
+    transition: opacity 0.3s ease-out;
+}
+
+.click-hide.click-hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Hide+after swap pairs — grid stacks them so they crossfade in-place. */
+.click-swap {
+    display: grid;
+}
+
+.click-swap > * {
+    grid-area: 1 / 1;
 }
 
 /* Presenter Mode */
