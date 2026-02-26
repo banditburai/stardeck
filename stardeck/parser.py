@@ -207,15 +207,15 @@ def _click_div(
     use_motion: bool,
 ) -> str:
     if hide:
-        return f'<div class="click-hide" data-click="{data_click}" data-class:click-hidden="{css_expr}">{inner}</div>'
+        return f'<div class="click-hide" data-click="{data_click}" data-class:click-hidden="{css_expr}">\n\n{inner}\n\n</div>'
     if not use_motion:
-        return f'<div class="click-reveal" data-click="{data_click}" data-class:revealed="{css_expr}">{inner}</div>'
+        return f'<div class="click-reveal" data-click="{data_click}" data-class:revealed="{css_expr}">\n\n{inner}\n\n</div>'
     motion_str = visibility(
         signal=sig_name,
         enter=enter(**_build_enter_kwargs(attrs, defaults)),
         exit_=exit_(**_build_exit_kwargs(attrs)),
     )
-    return f'<div class="click-reveal" data-click="{data_click}" data-motion="{motion_str}">{inner}</div>'
+    return f'<div class="click-reveal" data-click="{data_click}" data-motion="{motion_str}">\n\n{inner}\n\n</div>'
 
 
 def _process_match(match, current_click, highest_click, range_clicks, defaults, use_motion):
