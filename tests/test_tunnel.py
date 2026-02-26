@@ -2,12 +2,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
-from stardeck.cli import cli
-from stardeck.tunnel import start_tunnel, stop_tunnel
+from stardeck.cli import cli, start_tunnel, stop_tunnel
 
 
 def test_start_tunnel_no_ssh():
-    with patch("stardeck.tunnel.shutil.which", return_value=None):
+    with patch("stardeck.cli.shutil.which", return_value=None):
         with pytest.raises(FileNotFoundError, match="SSH not found"):
             start_tunnel(5001)
 
@@ -18,18 +17,18 @@ def test_url_extraction():
     mock_proc.poll.return_value = None
 
     with (
-        patch("stardeck.tunnel.shutil.which", return_value="/usr/bin/ssh"),
-        patch("stardeck.tunnel.subprocess.Popen", return_value=mock_proc),
-        patch("stardeck.tunnel.select.select", return_value=([99], [], [])),
+        patch("stardeck.cli.shutil.which", return_value="/usr/bin/ssh"),
+        patch("stardeck.cli.subprocess.Popen", return_value=mock_proc),
+        patch("stardeck.cli.select.select", return_value=([99], [], [])),
         patch(
-            "stardeck.tunnel.os.read",
+            "stardeck.cli.os.read",
             side_effect=[
                 b"Warning: Permanently added 'a.pinggy.io' to known hosts.\n",
                 b"http://rndzz-123.a.free.pinggy.link\n",
                 b"https://rndzz-123.a.free.pinggy.link\n",
             ],
         ),
-        patch("stardeck.tunnel.threading.Thread") as mock_thread,
+        patch("stardeck.cli.threading.Thread") as mock_thread,
     ):
         proc, url = start_tunnel(5001)
 
@@ -46,10 +45,10 @@ def test_start_tunnel_timeout():
     mock_proc.poll.return_value = None
 
     with (
-        patch("stardeck.tunnel.shutil.which", return_value="/usr/bin/ssh"),
-        patch("stardeck.tunnel.subprocess.Popen", return_value=mock_proc),
-        patch("stardeck.tunnel.select.select", return_value=([], [], [])),
-        patch("stardeck.tunnel.STARTUP_TIMEOUT", 0),
+        patch("stardeck.cli.shutil.which", return_value="/usr/bin/ssh"),
+        patch("stardeck.cli.subprocess.Popen", return_value=mock_proc),
+        patch("stardeck.cli.select.select", return_value=([], [], [])),
+        patch("stardeck.cli._STARTUP_TIMEOUT", 0),
     ):
         with pytest.raises(RuntimeError, match="Could not establish tunnel"):
             start_tunnel(5001)
@@ -63,10 +62,10 @@ def test_start_tunnel_ssh_exits_early():
     mock_proc.poll.side_effect = [None, 1]
 
     with (
-        patch("stardeck.tunnel.shutil.which", return_value="/usr/bin/ssh"),
-        patch("stardeck.tunnel.subprocess.Popen", return_value=mock_proc),
-        patch("stardeck.tunnel.select.select", return_value=([99], [], [])),
-        patch("stardeck.tunnel.os.read", return_value=b""),
+        patch("stardeck.cli.shutil.which", return_value="/usr/bin/ssh"),
+        patch("stardeck.cli.subprocess.Popen", return_value=mock_proc),
+        patch("stardeck.cli.select.select", return_value=([99], [], [])),
+        patch("stardeck.cli.os.read", return_value=b""),
     ):
         with pytest.raises(RuntimeError, match="Could not establish tunnel"):
             start_tunnel(5001)
@@ -78,16 +77,16 @@ def test_start_tunnel_uses_pro_host_with_token():
     mock_proc.poll.return_value = None
 
     with (
-        patch("stardeck.tunnel.shutil.which", return_value="/usr/bin/ssh"),
-        patch("stardeck.tunnel.subprocess.Popen", return_value=mock_proc) as mock_popen,
-        patch("stardeck.tunnel.select.select", return_value=([99], [], [])),
+        patch("stardeck.cli.shutil.which", return_value="/usr/bin/ssh"),
+        patch("stardeck.cli.subprocess.Popen", return_value=mock_proc) as mock_popen,
+        patch("stardeck.cli.select.select", return_value=([99], [], [])),
         patch(
-            "stardeck.tunnel.os.read",
+            "stardeck.cli.os.read",
             side_effect=[
                 b"https://myapp.a.pinggy.online\n",
             ],
         ),
-        patch("stardeck.tunnel.threading.Thread"),
+        patch("stardeck.cli.threading.Thread"),
     ):
         start_tunnel(5001, token="abc123")
 

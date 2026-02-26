@@ -39,7 +39,7 @@ def test_presenter_shows_speaker_notes(tmp_path: Path):
 
     md_file = mk_deck(tmp_path, "# Slide 1\n\n<!-- notes\nThese are my speaker notes.\n-->")
     app, _rt, deck_state = create_app(md_file)
-    token = deck_state["presenter_token"]
+    token = deck_state.presenter_token
     html = TestClient(app).get(f"/presenter?token={token}").text
     assert "These are my speaker notes" in html
 

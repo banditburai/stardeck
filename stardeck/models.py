@@ -1,5 +1,4 @@
-"""Data models for StarDeck."""
-
+import re
 from dataclasses import dataclass, field
 
 
@@ -29,6 +28,8 @@ class SlideInfo:
 @dataclass(frozen=True)
 class DeckConfig:
     title: str = "Untitled"
+    summary: str = ""
+    date: str = ""
     theme: str | None = None
     transition: str = "fade"
     click_animation: str = "fade"
@@ -76,3 +77,9 @@ class DrawingStore:
         snapshot = [{"type": "create", "element": el} for el in elements.values()]
         snapshot.append({"type": "reorder", "order": list(elements.keys())})
         return snapshot
+
+
+def strip_html(html: str) -> str:
+    """Remove HTML tags and normalize whitespace to plain text."""
+    text = re.sub(r"<[^>]+>", " ", html)
+    return re.sub(r"\s+", " ", text).strip()

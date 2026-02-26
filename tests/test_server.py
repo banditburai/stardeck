@@ -14,7 +14,7 @@ def test_create_app(tmp_path: Path):
     md_file = mk_deck(tmp_path, "# Test Slide")
     app, rt, deck_state = create_app(md_file)
 
-    assert deck_state["deck"].total == 1
+    assert deck_state.deck.total == 1
     assert app is not None
     assert rt is not None
 
@@ -52,7 +52,7 @@ def test_watch_creates_relay(tmp_path: Path):
 
     md_file = mk_deck(tmp_path, "# Test Slide")
     _app, _rt, deck_state = create_app(md_file, watch=True)
-    assert "watch_relay" in deck_state
+    assert deck_state.watch_relay is not None
 
 
 def test_watch_home_has_sse_elements(tmp_path: Path):
@@ -215,7 +215,7 @@ def test_presenter_next_endpoint(tmp_path: Path):
     resp = client.get("/api/presenter/next")
     assert resp.status_code == 200
     assert "text/event-stream" in resp.headers["content-type"]
-    assert state["presentation"].slide_index == 1
+    assert state.presentation.slide_index == 1
 
 
 def test_presenter_prev_endpoint(tmp_path: Path):
@@ -223,7 +223,7 @@ def test_presenter_prev_endpoint(tmp_path: Path):
 
     md_file = mk_deck(tmp_path, "# S1\n---\n# S2\n---\n# S3")
     app, _rt, state = create_app(md_file)
-    pres = state["presentation"]
+    pres = state.presentation
     pres.slide_index = 2
     resp = TestClient(app).get("/api/presenter/prev")
     assert resp.status_code == 200
@@ -237,7 +237,7 @@ def test_presenter_goto_endpoint(tmp_path: Path):
     app, _rt, state = create_app(md_file)
     resp = TestClient(app).get("/api/presenter/goto/2")
     assert resp.status_code == 200
-    assert state["presentation"].slide_index == 2
+    assert state.presentation.slide_index == 2
 
 
 def test_presenter_changes_unauthorized(tmp_path: Path):
@@ -254,7 +254,7 @@ def test_presenter_changes_invalid_json(tmp_path: Path):
 
     md_file = mk_deck(tmp_path, "# S1")
     app, _rt, state = create_app(md_file)
-    token = state["presenter_token"]
+    token = state.presenter_token
     resp = TestClient(app).post(
         f"/api/presenter/changes?token={token}",
         content=b"not json",
@@ -268,7 +268,7 @@ def test_presenter_changes_applies_drawing(tmp_path: Path):
 
     md_file = mk_deck(tmp_path, "# S1")
     app, _rt, state = create_app(md_file)
-    token = state["presenter_token"]
+    token = state.presenter_token
     changes = [{"type": "path", "data": "M0,0 L10,10"}]
     resp = TestClient(app).post(
         f"/api/presenter/changes?token={token}",

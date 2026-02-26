@@ -1,7 +1,5 @@
-"""Tests for stardeck renderer."""
-
 from stardeck.models import Deck, DeckConfig, SlideInfo
-from stardeck.renderer import render_code_block, render_slide
+from stardeck.renderer import render_slide
 from starhtml import to_xml
 
 
@@ -15,23 +13,6 @@ def _deck(slide, **config_kw):
 
 def _render(slide, **config_kw):
     return to_xml(render_slide(slide, _deck(slide, **config_kw)))
-
-
-def test_render_code_block():
-    result_str = str(render_code_block("print('hi')", "python"))
-    assert "code-block" in result_str
-
-
-def test_render_code_block_no_language():
-    result_str = str(render_code_block("hello world", ""))
-    assert "code-block" in result_str
-
-
-def test_render_code_block_multiline():
-    code = 'def hello():\n    print("Hello")\n    return True'
-    result_str = str(render_code_block(code, "python"))
-    assert "code-block" in result_str
-    assert "def" in result_str or "hello" in result_str
 
 
 def test_render_slide():

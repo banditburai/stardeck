@@ -138,7 +138,7 @@ def test_presentation_state_has_drawing_store(tmp_path: Path):
     md_file.write_text("# Slide 1")
 
     _app, _rt, deck_state = create_app(md_file)
-    pres = deck_state["presentation"]
+    pres = deck_state.presentation
 
     assert hasattr(pres, "drawing")
     assert isinstance(pres.drawing, DrawingStore)

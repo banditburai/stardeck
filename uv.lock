@@ -783,14 +783,14 @@ wheels = [
 
 [[package]]
 name = "star-drawing"
-version = "0.1.1"
+version = "0.1.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "starelements" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c5/a0/ad7659768d0373dffd528eccf48b1602356bae7110d3af5b9888a8f816be/star_drawing-0.1.1.tar.gz", hash = "sha256:4e0ecd2a41dfc955b4333d19539bec3ea0b12e4d3244a7814d1266deea9cafcc", size = 65203, upload-time = "2026-02-15T22:39:45.022Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/85/be/7bcf00e8cdf127ea1d688163979452aece5cbe9fb3b7d7509a0b16c2c7ac/star_drawing-0.1.3.tar.gz", hash = "sha256:a8f0fd39a257c342056833fd5bac2cd46246103beb5ead650f51cd812bf70f48", size = 78585, upload-time = "2026-02-21T02:02:04.427Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4b/fa/c7a54baaad23babb0d71f2bf223d2d284c12eac6dea79c929508da2c828a/star_drawing-0.1.1-py3-none-any.whl", hash = "sha256:f11281459de450252a3a308778b02e4b82bc62549b090b7153a02e70a119a2f3", size = 31016, upload-time = "2026-02-15T22:39:43.814Z" },
+    { url = "https://files.pythonhosted.org/packages/07/05/2ca1a5dfc5ee90ca9e1e8f92a960b89d9e79cb5c08f9f6fbe66e1bcf900d/star_drawing-0.1.3-py3-none-any.whl", hash = "sha256:cefeecce5a46aa5060a4af2b157e65763ccfdf1440d1f98cbddfc86cc3caad6a", size = 37158, upload-time = "2026-02-21T02:02:03.301Z" },
 ]
 
 [[package]]
@@ -840,7 +840,7 @@ requires-dist = [
     { name = "pytest-timeout", marker = "extra == 'test'" },
     { name = "pyyaml" },
     { name = "ruff", marker = "extra == 'dev'" },
-    { name = "star-drawing", specifier = ">=0.1.1" },
+    { name = "star-drawing", specifier = ">=0.1.3" },
     { name = "starelements", specifier = ">=0.1.2" },
     { name = "starhtml", specifier = ">=0.5.5" },
     { name = "watchfiles", marker = "extra == 'watch'" },
@@ -849,15 +849,15 @@ provides-extras = ["test", "dev", "watch", "tunnel"]
 
 [[package]]
 name = "starelements"
-version = "0.1.2"
+version = "0.1.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "platformdirs" },
     { name = "starhtml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/67/a0/677eb6b86941dd4b34af684eb78fac6ec7f56187d0c80fd0ad9c586cdb5b/starelements-0.1.2.tar.gz", hash = "sha256:5fb2965f4c4db2a200579fd9795c577f2ab30549eab890f1f7283716f32bfba0", size = 111197, upload-time = "2026-02-15T22:23:54.142Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3c/cd/d904e9b7172f5b66541e799565c64cd51137693a646a84e23344be55c447/starelements-0.1.3.tar.gz", hash = "sha256:b2ebe30c369411eab15c83af31bf03267d822bf4e9e1e70bbf4a6105e3ddd7db", size = 111348, upload-time = "2026-02-20T00:42:00.166Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a6/65/ba6edee914340ed3bdd1b020d71a5312903dc3237daf46c021630f2e4192/starelements-0.1.2-py3-none-any.whl", hash = "sha256:e12289df9a6b02775aa1013c40d71712635a37c5e35804ac4490504dbc030ac0", size = 26725, upload-time = "2026-02-15T22:23:52.381Z" },
+    { url = "https://files.pythonhosted.org/packages/5c/d5/e50225af088391dfd2b8e1ac01dea4cefb8adf1a27f7bcf228f4488d39b6/starelements-0.1.3-py3-none-any.whl", hash = "sha256:4608f8e26d9a4fa905642ae543b800bd14cd8c15de3e7586c1ca286b3d8dadde", size = 26747, upload-time = "2026-02-20T00:41:58.593Z" },
 ]
 
 [[package]]

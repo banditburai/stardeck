@@ -1,5 +1,3 @@
-"""Markdown parser for StarDeck."""
-
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -47,11 +45,8 @@ def _find_frontmatter_end(lines: list[str], start: int) -> int:
 
 
 def split_slides(content: str) -> list[str]:
-    """Split markdown content into slides by --- delimiter.
-
-    Handles Slidev-style mid-deck frontmatter: a --- / YAML / --- block
-    is attached to the following slide, not treated as a separate delimiter.
-    """
+    """Slidev-style mid-deck frontmatter (--- / YAML / ---) attaches to the
+    following slide rather than being treated as a separate delimiter."""
     lines = content.split("\n")
     slides: list[str] = []
     current: list[str] = []
@@ -82,17 +77,11 @@ def split_slides(content: str) -> list[str]:
 
 
 def parse_frontmatter(raw: str) -> tuple[dict, str]:
-    """Extract YAML frontmatter from slide content."""
     if not raw.startswith("---"):
         return {}, raw
 
     lines = raw.split("\n")
-    end_idx = None
-    for i, line in enumerate(lines[1:], start=1):
-        if line.strip() == "---":
-            end_idx = i
-            break
-
+    end_idx = next((i for i, ln in enumerate(lines[1:], 1) if ln.strip() == "---"), None)
     if end_idx is None:
         return {}, raw
 
@@ -133,7 +122,6 @@ def _parse_click_attrs(tag_attrs: str) -> dict:
 
 
 def _is_bare_attr(tag_attrs: str, name: str) -> bool:
-    """Detect bare boolean attribute (e.g., 'hide' without '=value')."""
     stripped = _ATTR_RE.sub("", tag_attrs)
     return name in stripped.split()
 
@@ -159,34 +147,29 @@ def _restore_code(content: str, stashed: list[str]) -> str:
 
 
 _TRANSFORM_PROPS = {"x", "y", "scale", "rotate", "opacity"}
+_EXIT_PROPS = ("duration", "delay", "ease", "spring", "x", "y", "scale", "rotate", "opacity")
 
 
 def _build_enter_kwargs(attrs: dict, defaults: ClickDefaults) -> dict:
-    kw: dict = {}
-    kw["preset"] = attrs.get("animation", defaults.animation)
-    duration = attrs.get("duration", defaults.duration)
-    kw["duration"] = duration if duration is not None else 300
-    kw["delay"] = attrs.get("delay", defaults.delay)
-    kw["ease"] = attrs.get("ease", defaults.ease)
-    kw["spring"] = attrs.get("spring", defaults.spring)
-    overrides = _TRANSFORM_PROPS & attrs.keys()
-    for prop in overrides:
-        kw[prop] = attrs[prop]
-    if overrides:
+    kw = {
+        "preset": attrs.get("animation", defaults.animation),
+        "duration": attrs.get("duration", defaults.duration) or 300,
+        "delay": attrs.get("delay", defaults.delay),
+        "ease": attrs.get("ease", defaults.ease),
+        "spring": attrs.get("spring", defaults.spring),
+        **{p: attrs[p] for p in _TRANSFORM_PROPS & attrs.keys()},
+    }
+    if _TRANSFORM_PROPS & attrs.keys():
         kw.pop("preset", None)
     return {k: v for k, v in kw.items() if v is not None}
 
 
 def _build_exit_kwargs(attrs: dict) -> dict:
-    kw: dict = {}
-    for prop in ("duration", "delay", "ease", "spring", "x", "y", "scale", "rotate", "opacity"):
-        if (val := attrs.get(f"exit-{prop}")) is not None:
-            kw[prop] = val
+    kw = {p: v for p in _EXIT_PROPS if (v := attrs.get(f"exit-{p}")) is not None}
     return kw or {"opacity": 0, "duration": 250}
 
 
 def transform_clicks_wrapper(content: str) -> str:
-    """Expand <clicks> wrappers into individual <click> tags per paragraph."""
     content, stashed = _stash_code(content)
 
     def _expand(m: re.Match) -> str:
@@ -334,34 +317,19 @@ def transform_click_tags(
 
 
 def transform_regions(content: str) -> str:
-    """Transform region tags (<left>...</left>) into div wrappers.
-
-    Skips content inside code fences.
-    """
-    fences: list[str] = []
-
-    def _stash_fence(m: re.Match) -> str:
-        fences.append(m.group(0))
-        return f"\x00FENCE{len(fences) - 1}\x00"
-
-    protected = re.sub(r"```.*?```", _stash_fence, content, flags=re.DOTALL)
+    content, stashed = _stash_code(content)
 
     def _replace_region(m: re.Match) -> str:
         tag, attrs, inner = m.group(1), m.group(2) or "", m.group(3).strip()
         cls_match = re.search(r'class="([^"]*)"', attrs) if attrs else None
-        extra = cls_match.group(1) if cls_match else ""
-        cls = f"sd-region {extra}".strip() if extra else "sd-region"
+        cls = f"sd-region {cls_match.group(1)}" if cls_match else "sd-region"
         return f'\n<div class="{cls}" data-region="{tag}">\n\n{inner}\n\n</div>\n'
 
-    result = _REGION_RE.sub(_replace_region, protected)
-
-    for i, fence in enumerate(fences):
-        result = result.replace(f"\x00FENCE{i}\x00", fence)
-    return result
+    return _restore_code(_REGION_RE.sub(_replace_region, content), stashed)
 
 
 def extract_notes(content: str) -> tuple[str, str]:
-    """Extract <!-- notes ... --> blocks. Handles multiple note blocks per slide."""
+    """Handles multiple note blocks per slide."""
     matches = list(_NOTES_RE.finditer(content))
     if not matches:
         return content, ""
@@ -453,6 +421,8 @@ def parse_deck(filepath: Path, *, use_motion: bool = False) -> Deck:
     deck_fm = slides[0].frontmatter if slides else {}
     config_keys = (
         "title",
+        "summary",
+        "date",
         "theme",
         "transition",
         "click-animation",
@@ -461,24 +431,25 @@ def parse_deck(filepath: Path, *, use_motion: bool = False) -> Deck:
         "click-ease",
         "click-spring",
     )
-    config_fields = {k.replace("-", "_"): deck_fm[k] for k in config_keys if deck_fm.get(k) is not None}
+    config_fields = {}
+    for k in config_keys:
+        val = deck_fm.get(k)
+        if val is not None:
+            config_fields[k.replace("-", "_")] = str(val) if k == "date" else val
     return Deck(slides=slides, config=DeckConfig(**config_fields))
 
 
 def deck_has_clicks(deck_path: Path) -> bool:
-    """Quick scan for click-related tags without full parsing."""
+    """Avoids full parsing — just scans raw text."""
     text = deck_path.read_text()
     return any(f"<{tag}>" in text or f"<{tag} " in text for tag in ("click", "after", "clicks"))
 
 
 def build_click_signals(deck: Deck, clicks_signal) -> list:
-    """Build computed visibility signals shared by server and export."""
+    """Shared by server and export paths."""
     max_deck_clicks = max((s.max_clicks for s in deck.slides), default=0)
     sigs = [Signal(f"vis{i}", clicks_signal >= i) for i in range(1, max_deck_clicks + 1)]
 
-    all_ranges: set[tuple[int, int]] = set()
-    for s in deck.slides:
-        all_ranges.update(s.range_clicks)
-
-    sigs.extend(Signal(f"vis_{lo}_{hi}", (clicks_signal >= lo) & (clicks_signal < hi)) for lo, hi in sorted(all_ranges))
+    all_ranges = sorted({r for s in deck.slides for r in s.range_clicks})
+    sigs.extend(Signal(f"vis_{lo}_{hi}", (clicks_signal >= lo) & (clicks_signal < hi)) for lo, hi in all_ranges)
     return sigs
