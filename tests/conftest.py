@@ -49,4 +49,4 @@ def client(app_and_state) -> TestClient:
 def presenter_token(app_and_state) -> str:
     """Presenter authentication token."""
     _, deck_state = app_and_state
-    return deck_state["presenter_token"]
+    return deck_state.presenter_token

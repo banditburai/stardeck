@@ -1,10 +1,9 @@
-"""StarDeck server application."""
-
 import asyncio
 import json
 import secrets
 import time
 from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from star_drawing import DrawingCanvas
@@ -28,9 +27,8 @@ from starhtml.plugins import motion, resize
 from starhtml.realtime import SSE_HEADERS
 from starlette.responses import JSONResponse, StreamingResponse
 
-from stardeck.models import DrawingStore
+from stardeck.models import Deck, DrawingStore
 from stardeck.parser import build_click_signals, deck_has_clicks, parse_deck
-from stardeck.presenter import create_presenter_view
 from stardeck.renderer import (
     HASH_UPDATE_EFFECT,
     SLIDE_HEIGHT,
@@ -39,6 +37,7 @@ from stardeck.renderer import (
     VIEWBOX_WIDTH,
     build_grid_cards,
     build_grid_modal,
+    create_presenter_view,
     render_slide,
 )
 from stardeck.themes import deck_hdrs, get_theme_bg, get_theme_color_scheme
@@ -47,7 +46,7 @@ _AUDIENCE_CANVAS = "#audience-canvas"
 _SSE_TIMEOUT = 30.0
 
 
-async def _sse_stream(relay, initial_events=None):
+async def _sse_stream(relay, initial_events=()):
     queue = relay.subscribe()
     try:
         if initial_events:
@@ -129,10 +128,8 @@ class PresentationState:
 
     def goto_slide(self, idx: int, clicks: int = 0):
         idx = max(0, min(idx, self.deck.total - 1))
-        slide = self.deck.slides[idx]
-        clicks = max(0, min(clicks, slide.max_clicks))
         self.slide_index = idx
-        self.clicks = clicks
+        self.clicks = max(0, min(clicks, self.deck.slides[idx].max_clicks))
         self.broadcast()
 
     def next(self):
@@ -159,6 +156,16 @@ class PresentationState:
     def apply_and_broadcast_changes(self, slide_index: int, changes: list[dict]):
         self.drawing.apply_changes(slide_index, changes)
         self.relay.emit_script(_drawing_script(_AUDIENCE_CANVAS, json.dumps(changes)))
+
+
+@dataclass
+class AppState:
+    deck: Deck
+    path: Path
+    watch: bool
+    presentation: PresentationState
+    presenter_token: str
+    watch_relay: Relay | None = field(default=None)
 
 
 def _yield_presenter_with_snapshot(pres):
@@ -201,20 +208,20 @@ def create_app(deck_path: Path, *, theme: str | None = None, watch: bool = False
     initial_deck = parse_deck(deck_path, use_motion=has_clicks)
     theme = theme or initial_deck.config.theme or "default"
     presenter_token = secrets.token_urlsafe(16)
-    deck_state = {
-        "deck": initial_deck,
-        "path": deck_path,
-        "watch": watch,
-        "presentation": PresentationState(initial_deck),
-        "presenter_token": presenter_token,
-    }
+    state = AppState(
+        deck=initial_deck,
+        path=deck_path,
+        watch=watch,
+        presentation=PresentationState(initial_deck),
+        presenter_token=presenter_token,
+    )
 
     watch_lifespan = None
     if watch:
-        deck_state["watch_relay"] = Relay()
+        state.watch_relay = Relay()
 
         def _on_file_change():
-            deck_state["watch_relay"].emit_signals({"file_version": int(time.time() * 1000)})
+            state.watch_relay.emit_signals({"file_version": int(time.time() * 1000)})
 
         watcher = FileWatcher(deck_path, _on_file_change)
 
@@ -255,8 +262,8 @@ def create_app(deck_path: Path, *, theme: str | None = None, watch: bool = False
 
     @rt("/")
     def home():
-        pres = deck_state["presentation"]
-        deck = deck_state["deck"]
+        pres = state.presentation
+        deck = state.deck
 
         slide_index = Signal("slide_index", pres.slide_index)
         total_slides = Signal("total_slides", deck.total)
@@ -302,6 +309,7 @@ def create_app(deck_path: Path, *, theme: str | None = None, watch: bool = False
                         style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:100;",
                         viewbox_width=VIEWBOX_WIDTH,
                         viewbox_height=VIEWBOX_HEIGHT,
+                        theme=get_theme_color_scheme(theme),
                     ),
                     cls="slide-scaler",
                     data_attr_style="transform: translate(-50%, -50%) scale(" + slide_scale + ")",
@@ -363,19 +371,19 @@ def create_app(deck_path: Path, *, theme: str | None = None, watch: bool = False
 
     @rt("/presenter")
     def presenter(token: str = ""):
-        if token != deck_state["presenter_token"]:
+        if token != state.presenter_token:
             return Div(
                 Div("Access Denied", style="font-size:2rem;color:#f44;margin-bottom:1rem"),
                 Div("Presenter mode requires a valid token.", style="color:#888"),
                 style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#121212;font-family:system-ui",
             )
-        return create_presenter_view(deck_state["deck"], deck_state["presentation"], token=token)
+        color_scheme = get_theme_color_scheme(theme)
+        return create_presenter_view(state.deck, state.presentation, token=token, theme=color_scheme)
 
     @rt("/api/events")
     async def events():
-        pres = deck_state["presentation"]
-        # No initial signals — HTML already has correct state, and sending them
-        # here races with hash navigation, resetting clicks to 0.
+        pres = state.presentation
+        # HTML already has correct state; sending signals here races with hash navigation
         initial = []
         snapshot = pres.drawing.get_snapshot(pres.slide_index)
         if snapshot:
@@ -389,27 +397,27 @@ def create_app(deck_path: Path, *, theme: str | None = None, watch: bool = False
     @rt("/api/presenter/next")
     @sse
     def presenter_next():
-        pres = deck_state["presentation"]
+        pres = state.presentation
         pres.next()
         yield from _yield_presenter_with_snapshot(pres)
 
     @rt("/api/presenter/prev")
     @sse
     def presenter_prev():
-        pres = deck_state["presentation"]
+        pres = state.presentation
         pres.prev()
         yield from _yield_presenter_with_snapshot(pres)
 
     @rt("/api/presenter/goto/{idx}")
     @sse
     def presenter_goto(idx: int, clicks: int = 0):
-        pres = deck_state["presentation"]
+        pres = state.presentation
         pres.goto_slide(idx, clicks)
         yield from _yield_presenter_with_snapshot(pres)
 
     @rt("/api/presenter/changes", methods=["POST"])
     async def presenter_changes(token: str, request):
-        if token != deck_state["presenter_token"]:
+        if token != state.presenter_token:
             return JSONResponse({"error": "unauthorized"}, status_code=401)
         try:
             body = await request.json()
@@ -418,7 +426,7 @@ def create_app(deck_path: Path, *, theme: str | None = None, watch: bool = False
         changes = body.get("changes", [])
         if not changes:
             return JSONResponse({"ok": True, "applied": 0})
-        pres = deck_state["presentation"]
+        pres = state.presentation
         slide_index = body.get("slide_index", pres.slide_index)
         pres.apply_and_broadcast_changes(slide_index, changes)
         return JSONResponse({"ok": True, "applied": len(changes)})
@@ -426,25 +434,24 @@ def create_app(deck_path: Path, *, theme: str | None = None, watch: bool = False
     @rt("/api/slide/next")
     @sse
     def next_slide(slide_index: int = 0):
-        current_deck = deck_state["deck"]
+        current_deck = state.deck
         yield from yield_audience_updates(current_deck, min(slide_index + 1, current_deck.total - 1))
 
     @rt("/api/slide/prev")
     @sse
     def prev_slide(slide_index: int = 0):
-        current_deck = deck_state["deck"]
+        current_deck = state.deck
         yield from yield_audience_updates(current_deck, max(slide_index - 1, 0))
 
     @rt("/api/slide/{idx}")
     @sse
     def goto_slide(idx: int, clicks: int = 0):
-        current_deck = deck_state["deck"]
+        current_deck = state.deck
         idx = max(0, min(idx, current_deck.total - 1))
         clicks = max(0, min(clicks, current_deck.slides[idx].max_clicks))
         yield from yield_audience_updates(current_deck, idx, clicks)
 
     def _signal_deps(deck):
-        """Hashable fingerprint of signals needed for a deck."""
         mc = max((s.max_clicks for s in deck.slides), default=0)
         ranges = frozenset().union(*(s.range_clicks for s in deck.slides)) if deck.slides else frozenset()
         return mc, ranges
@@ -452,11 +459,11 @@ def create_app(deck_path: Path, *, theme: str | None = None, watch: bool = False
     @rt("/api/reload")
     @sse
     def reload_deck(slide_index: int = 0):
-        old_mc, old_ranges = _signal_deps(deck_state["deck"])
-        use_motion = deck_has_clicks(deck_state["path"])
-        current_deck = parse_deck(deck_state["path"], use_motion=use_motion)
-        deck_state["deck"] = current_deck
-        deck_state["presentation"].reload_deck(current_deck)
+        old_mc, old_ranges = _signal_deps(state.deck)
+        use_motion = deck_has_clicks(state.path)
+        current_deck = parse_deck(state.path, use_motion=use_motion)
+        state.deck = current_deck
+        state.presentation.reload_deck(current_deck)
         new_mc, new_ranges = _signal_deps(current_deck)
 
         if new_mc > old_mc or new_ranges - old_ranges:
@@ -469,7 +476,7 @@ def create_app(deck_path: Path, *, theme: str | None = None, watch: bool = False
 
     @rt("/api/watch-events")
     async def watch_events():
-        relay = deck_state.get("watch_relay")
+        relay = state.watch_relay
         if not relay:
             return JSONResponse({"error": "watch not enabled"}, status_code=404)
         return StreamingResponse(
@@ -478,4 +485,4 @@ def create_app(deck_path: Path, *, theme: str | None = None, watch: bool = False
             headers=SSE_HEADERS,
         )
 
-    return app, rt, deck_state
+    return app, rt, state

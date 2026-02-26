@@ -1,5 +1,3 @@
-"""Export a StarDeck presentation as standalone HTML."""
-
 import json
 import re
 import shutil
@@ -10,6 +8,7 @@ from fastcore.xml import to_xml
 from starhtml import Body, Button, Div, Head, Html, Meta, NotStr, Script, Signal, Span, Style, Title
 from starhtml.datastar import evt, js, seq
 
+from stardeck.models import Deck
 from stardeck.parser import build_click_signals, deck_has_clicks, parse_deck
 from stardeck.renderer import HASH_UPDATE_EFFECT, render_slide
 from stardeck.themes import deck_hdrs, get_theme_bg, get_theme_color_scheme
@@ -25,7 +24,6 @@ _MOTION_LOADER = (
 
 
 def _write_js_assets(output_dir: Path, *, include_motion: bool) -> None:
-    """Write JS files to output directory for import map resolution."""
     datastar_js = (resources.files("starhtml") / "static" / "datastar.js").read_text()
     (output_dir / "datastar.js").write_text(datastar_js)
 
@@ -43,8 +41,9 @@ def _build_head(deck, theme: str, *, use_motion: bool) -> Head:
         Meta(charset="UTF-8"),
         Meta(name="viewport", content="width=device-width, initial-scale=1.0"),
         Title(deck.config.title),
-        # Import map MUST precede any type="module" scripts
-        NotStr(f'<script type="importmap">{json.dumps({"imports": import_map})}</script>'),
+        NotStr(
+            f'<script type="importmap">{json.dumps({"imports": import_map})}</script>'
+        ),  # must precede module scripts
         *deck_hdrs(theme),
         Script(src="./datastar.js", type="module"),
     ]
@@ -55,10 +54,12 @@ def _build_head(deck, theme: str, *, use_motion: bool) -> Head:
     return Head(*head_children)
 
 
-def export_deck(deck_path: Path, output_dir: Path, theme: str | None = None) -> Path:
-    """Export a presentation to a self-contained directory."""
-    use_motion = deck_has_clicks(deck_path)
-    deck = parse_deck(deck_path, use_motion=use_motion)
+def export_deck(deck_path: Path, output_dir: Path, theme: str | None = None, *, deck: Deck | None = None) -> Path:
+    if deck is not None:
+        use_motion = any(s.max_clicks > 0 for s in deck.slides)
+    else:
+        use_motion = deck_has_clicks(deck_path)
+        deck = parse_deck(deck_path, use_motion=use_motion)
     theme = theme or deck.config.theme or "default"
 
     mc_array = f"[{', '.join(str(s.max_clicks) for s in deck.slides)}]"
